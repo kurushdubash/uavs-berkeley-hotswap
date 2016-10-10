@@ -17,10 +17,10 @@ while display.isNotDone():
 
 	img = cam.getImage().flipHorizontal()
 	dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(2).invert()
-	segmented = dist.stretch(235,255)
+	segmented = dist.stretch(220,255)
 	blobs = segmented.findBlobs()
 	if blobs:
-		squares = blobs.filter([b.isRectangle(0.15) for b in blobs])
+		squares = blobs.filter([b.isRectangle(0.13) for b in blobs])
 		if squares:
 			largest_square = squares[-1]
 			if largest_square.area() >= MIN_AREA:

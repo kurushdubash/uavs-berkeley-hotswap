@@ -7,12 +7,16 @@ display = Display()
 count = 0
 while display.isNotDone():
 	img = cam.getImage()
-	facedetect = img.findHaarFeatures('face2.xml')
+	img2 = img.hueDistance(color=Color.RED).binarize(128)
+	img2 = img2.binarize(blocksize=3,p=1)
+	img3 = img.sideBySide(img2)
+	# facedetect = img.findHaarFeatures('face2.xml')
 	if img == None:
 		continue
-	if facedetect:
-		facedetect.draw()
-	img.show()
+	# if facedetect:
+		# facedetect.draw()
+	# img = img.erode()
+	img3.show()
 	# time.sleep(.01)
 	count += 1
 	if count == 1000:

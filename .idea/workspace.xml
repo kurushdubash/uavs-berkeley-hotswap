@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="b3231907-9404-4aee-ab21-3f4585dcd26d" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/block.py" afterPath="$PROJECT_DIR$/block.py" />
-    </list>
+    <list default="true" id="b3231907-9404-4aee-ab21-3f4585dcd26d" name="Default" comment="" />
     <ignored path="uavs-berkeley-hotswap.iws" />
     <ignored path=".idea/workspace.xml" />
     <ignored path=".idea/dataSources.local.xml" />
@@ -43,8 +41,8 @@
       <file leaf-file-name="ImageClass.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/../Lib/site-packages/SimpleCV/ImageClass.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.3042017" vertical-offset="55171" max-vertical-offset="184433">
-              <caret line="3257" column="8" selection-start-line="3257" selection-start-column="8" selection-end-line="3257" selection-end-column="8" />
+            <state vertical-scroll-proportion="0.27563027" vertical-offset="55953" max-vertical-offset="184433">
+              <caret line="3302" column="67" selection-start-line="3302" selection-start-column="8" selection-end-line="3302" selection-end-column="67" />
               <folding />
             </state>
           </provider>
@@ -290,8 +288,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/../Lib/site-packages/SimpleCV/ImageClass.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.3042017" vertical-offset="55171" max-vertical-offset="184433">
-          <caret line="3257" column="8" selection-start-line="3257" selection-start-column="8" selection-end-line="3257" selection-end-column="8" />
+        <state vertical-scroll-proportion="0.27563027" vertical-offset="55953" max-vertical-offset="184433">
+          <caret line="3302" column="67" selection-start-line="3302" selection-start-column="8" selection-end-line="3302" selection-end-column="67" />
           <folding />
         </state>
       </provider>

@@ -1,18 +1,11 @@
-'''
-This is how to track a white ball example using SimpleCV
-The parameters may need to be adjusted to match the RGB color
-of your object.
-The demo video can be found at:
-http://www.youtube.com/watch?v=jihxqg3kr-g
-'''
-print __doc__
-
 import SimpleCV
 
 display = SimpleCV.Display()
-cam = SimpleCV.Camera(0)
+# cam = SimpleCV.Camera(0)
+address = "admin:admin@192.168.29.206:8081/video"
+cam = SimpleCV.JpegStreamCamera(address)
 normaldisplay = True
-
+MIN_AREA = 1500
 while display.isNotDone():
 
 	if display.mouseRight:
@@ -20,18 +13,20 @@ while display.isNotDone():
 		print "Display Mode:", "Normal" if normaldisplay else "Segmented" 
 	
 	img = cam.getImage().flipHorizontal()
-	dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(2).invert()
-	segmented = dist.stretch(220,255)
+	dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(3).invert()
+	segmented = dist.stretch(225,255)
 	blobs = segmented.findBlobs()
 	if blobs:
 		squares = blobs.filter([b.isRectangle(0.2) for b in blobs])
 		if squares:
-			big = squares[-1]
-			width = squares[-1].width()
-			height = squares[-1].height()
-			x = squares[-1].x - (width / 2)
-			y = squares[-1].y - (height /2) 
-			img.drawRectangle(x, y, width, height, SimpleCV.Color.BLUE, 3)
+			largest_square = squares[-1]
+			if largest_square.area() >= MIN_AREA:
+				width = largest_square.width()
+				height = largest_square.height()
+				x = largest_square.x - (width / 2)
+				y = largest_square.y - (height /2) 
+				# print largest_square.area()
+				img.drawRectangle(x, y, width, height, SimpleCV.Color.BLUE, 3)
 
 	if normaldisplay:
 		img.show()

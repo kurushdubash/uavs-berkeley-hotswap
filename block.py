@@ -16,8 +16,16 @@ while display.isNotDone():
 		hull = not(hull)
 
 	img = cam.getImage().flipHorizontal()
-	dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(2).invert()
-	segmented = dist.stretch(220,255)
+	
+	# Option 1
+	a = img.colorDistance((255,0,0))
+	red = img-a
+	segmented = red.erode(5).binarize().invert()
+	
+	# Option 2
+	# dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(2).invert()
+	# segmented = dist.stretch(220,255)
+
 	blobs = segmented.findBlobs()
 	if blobs:
 		squares = blobs.filter([b.isRectangle(0.13) for b in blobs])

@@ -1,11 +1,11 @@
 import SimpleCV
 
 display = SimpleCV.Display()
-# cam = SimpleCV.Camera(0)
-address = "admin:admin@192.168.29.206:8081/video"
-cam = SimpleCV.JpegStreamCamera(address)
+cam = SimpleCV.Camera(0)
+# address = "admin:admin@192.168.29.206:8081/video"
+# cam = SimpleCV.JpegStreamCamera(address)
 normaldisplay = True
-MIN_AREA = 1500
+MIN_AREA = 2500
 while display.isNotDone():
 
 	if display.mouseRight:
@@ -13,8 +13,8 @@ while display.isNotDone():
 		print "Display Mode:", "Normal" if normaldisplay else "Segmented" 
 	
 	img = cam.getImage().flipHorizontal()
-	dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(3).invert()
-	segmented = dist.stretch(225,255)
+	dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(1).invert()
+	segmented = dist.stretch(235,255)
 	blobs = segmented.findBlobs()
 	if blobs:
 		squares = blobs.filter([b.isRectangle(0.2) for b in blobs])
@@ -27,7 +27,7 @@ while display.isNotDone():
 				y = largest_square.y - (height /2) 
 				# print largest_square.area()
 				img.drawRectangle(x, y, width, height, SimpleCV.Color.BLUE, 3)
-
+				img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)
 	if normaldisplay:
 		img.show()
 	else:

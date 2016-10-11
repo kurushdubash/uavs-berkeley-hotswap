@@ -4,32 +4,37 @@ display = SimpleCV.Display()
 cam = SimpleCV.Camera(0)
 # address = "admin:admin@192.168.29.206:8081/video"
 # cam = SimpleCV.JpegStreamCamera(address)
-normaldisplay = True
+normaldisplay = 0
 hull = False
 MIN_AREA = 2500
 while display.isNotDone():
 
 	if display.mouseRight:
-		normaldisplay = not(normaldisplay)
-		print "Display Mode:", "Normal" if normaldisplay else "Segmented" 
+		normaldisplay = (normaldisplay + 1) % 3 
+
 	if display.mouseLeft:
 		hull = not(hull)
 
 	img = cam.getImage().flipHorizontal()
 	
 	# Option 1
-	a = img.colorDistance((255,0,0))
-	red = img-a
-	segmented = red.erode(5).binarize().invert()
+	away_from_red = img.colorDistance((255,0,0))
+	only_red = img - away_from_red
+	segmented_red = only_red.erode(5).binarize().invert()
+	
+	away_from_cyan = img.colorDistance((0,255,255))
+	only_cyan = img - away_from_cyan
+	segmented_cyan = only_cyan.erode(5).binarize().invert()
 	
 	# Option 2
 	# dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(2).invert()
 	# segmented = dist.stretch(220,255)
-
-	blobs = segmented.findBlobs()
+	square_found = False
+	blobs = segmented_red.findBlobs()
 	if blobs:
 		squares = blobs.filter([b.isRectangle(0.13) for b in blobs])
 		if squares:
+			square_found = True
 			largest_square = squares[-1]
 			if largest_square.area() >= MIN_AREA:
 				width = largest_square.width()
@@ -49,7 +54,17 @@ while display.isNotDone():
 				else:
 					img.drawRectangle(x, y, width, height, SimpleCV.Color.BLUE, 3)
 				img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)
-	if normaldisplay:
-		img.show()
+	circles = segmented_cyan.findBlobs()
+	if circles and square_found:
+		circle = circles.filter([c.isCircle(0.13) for c in circles])
+		# if circle:
+		# 	largest_circle = circle[-1]
+		# 	img.drawCircle((largest_circle.x,largest_circle.y), 3, SimpleCV.Color.BLUE, 3)
+		# 	img.drawCircle((largest_circle.x,largest_circle.y), largest_circle.radius(), SimpleCV.Color.BLUE, 3)
+
+	if normaldisplay == 2:
+		segmented_cyan.show()
+	elif normaldisplay == 1:
+		segmented_red.show()
 	else:
-		segmented.show()
+		img.show()

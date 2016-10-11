@@ -10,7 +10,7 @@ MIN_AREA = 2500
 while display.isNotDone():
 
 	if display.mouseRight:
-		normaldisplay = (normaldisplay + 1) % 3 
+		normaldisplay = (normaldisplay + 1) % 3
 
 	if display.mouseLeft:
 		hull = not(hull)
@@ -22,15 +22,16 @@ while display.isNotDone():
 	only_red = img - away_from_red
 	segmented_red = only_red.erode(5).binarize().invert()
 	
-	# away_from_cyan = img.colorDistance((0,255,255))
-	# only_cyan = img - away_from_cyan
-	# segmented_cyan = only_cyan.erode(5).binarize().invert()
+	away_from_cyan = img.colorDistance((0,255,255))
+	only_cyan = img - away_from_cyan
+	segmented_cyan = only_cyan.erode(5).binarize().invert()
 	
 	# Option 2
 	# dist = img.hueDistance(SimpleCV.Color.BLACK).dilate(2).invert()
 	# segmented = dist.stretch(220,255)
 	square_found = False
 	biggest_blob = None
+	biggest_circle = None
 	blobs = segmented_red.findBlobs()
 	if blobs:
 		squares = blobs.filter([b.isRectangle(0.13) for b in blobs])
@@ -43,6 +44,7 @@ while display.isNotDone():
 				height = largest_square.height()
 				x = largest_square.x - (width / 2)
 				y = largest_square.y - (height /2) 
+				img.drawLine(largest_square.centroid(), (620/2,480/2), SimpleCV.Color.CYAN, 3)
 
 				# Use for convex hull instead of rectangle
 				if hull:
@@ -56,15 +58,18 @@ while display.isNotDone():
 				else:
 					img.drawRectangle(x, y, width, height, SimpleCV.Color.BLUE, 3)
 				img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)
-	# circles = segmented_cyan.findBlobs()
-	# if circles and square_found:
-		# circle = circles.filter([c.isCircle(0.13) for c in circles])
-		# if circle:
-		# 	largest_circle = circle[-1]
-		# 	img.drawCircle((largest_circle.x,largest_circle.y), 3, SimpleCV.Color.BLUE, 3)
-		# 	img.drawCircle((largest_circle.x,largest_circle.y), largest_circle.radius(), SimpleCV.Color.BLUE, 3)
+	circles = segmented_cyan.findBlobs()
+	if circles and square_found:
+		circle = circles.filter([c.isCircle(0.13) for c in circles])
+		if circle:
+			largest_circle = circle[-1]
+			biggest_circle = largest_circle
+			img.drawCircle((largest_circle.x,largest_circle.y), 3, SimpleCV.Color.BLUE, 3)
+			img.drawCircle((largest_circle.x,largest_circle.y), largest_circle.radius(), SimpleCV.Color.BLUE, 3)
 
 	if normaldisplay == 2:
+		if biggest_circle != None:
+			biggest_circle.draw((0,255,255))
 		segmented_cyan.show()
 	elif normaldisplay == 1:
 		if biggest_blob != None:

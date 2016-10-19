@@ -44,12 +44,6 @@ def check_position(img, blob):
 def draw_hull(img, blob):
 	""" Draws a convex hull of the blob. """
 	list_of_points = blob.hull()
-	largest = (0,0)
-	for x,y in list_of_points:
-		if x > largest[0] and y > largest[1]:
-			largest= (x,y)
-	img.drawCircle(largest, 3, SimpleCV.Color.BLUE, 3)
-
 	tempx = list_of_points[0][0]
 	tempy = list_of_points[0][1]
 	for x1,y1 in list_of_points:
@@ -121,11 +115,6 @@ def run(cam=SimpleCV.Camera(0)):
 						draw_hull(img, largest_square)
 
 					else:
-						# img.drawLine(largest_square.bottomLeftCorner(), largest_square.bottomRightCorner(), SimpleCV.Color.BLUE, 3)
-						# img.drawLine(largest_square.bottomLeftCorner(), largest_square.topLeftCorner(), SimpleCV.Color.BLUE, 3)
-						# img.drawLine(largest_square.bottomRightCorner(), largest_square.topRightCorner(), SimpleCV.Color.BLUE, 3)
-						# img.drawLine(largest_square.topLeftCorner(), largest_square.topRightCorner(), SimpleCV.Color.BLUE, 3)
-
 						img.drawRectangle(x1, y1, width, height, SimpleCV.Color.BLUE, 3)
 
 					img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)

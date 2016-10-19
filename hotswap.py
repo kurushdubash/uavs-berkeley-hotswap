@@ -50,12 +50,24 @@ def draw_hull(img, blob):
 		tempx=x1
 		tempy=y1
 
-def display_distance(img, blob):
+def display_distance(img, blob=None):
 	""" Draws text on the img layer displaying the distance from the object. """ 
 	# TODO FIGURE OUT DISANCE:
-	txt = "Distance: " + str(blob.area())
+	txt = "Distance: N/A" 
+	if blob:
+		txt = "Distance: " + str(blob.area())
 	text_layer = SimpleCV.DrawingLayer((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 	text_layer.ezViewText(txt, (20,20), (0,0,0), (255,255,255))
+	img.addDrawingLayer(text_layer)
+
+def display_orientation(img, blob=None):
+	""" Draws text on the img layer displaying the orientation from the object. """ 
+	# TODO FIGURE OUT Orientation:
+	txt = "Orientation: N/A"
+	if blob:
+		txt = "Orientation: " + str(blob.width())
+	text_layer = SimpleCV.DrawingLayer((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+	text_layer.ezViewText(txt, (20,40), (0,0,0), (255,255,255))
 	img.addDrawingLayer(text_layer)
 
 def run(cam=SimpleCV.Camera(0)):
@@ -74,6 +86,9 @@ def run(cam=SimpleCV.Camera(0)):
 		away_from_red = img.colorDistance((255,0,0))
 		only_red = img - away_from_red
 		segmented_red = only_red.erode(5).binarize().invert()
+
+		display_distance(img)
+		display_orientation(img)
 		
 		biggest_blob = None
 		blobs = segmented_red.findBlobs()
@@ -88,10 +103,12 @@ def run(cam=SimpleCV.Camera(0)):
 					x1 = largest_square.x - (width / 2)
 					y1 = largest_square.y - (height /2)
 
+					display_distance(img, largest_square)
+					display_orientation(img, largest_square)
+
 					# Guidance 
 					vector_to_center(img, largest_square.centroid())
 					check_position(img, largest_square)
-					display_distance(img, largest_square)
 					# Use for convex hull instead of rectangle
 					if hull:
 						draw_hull(img, largest_square)

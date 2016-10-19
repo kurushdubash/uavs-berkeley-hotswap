@@ -1,61 +1,11 @@
-import SimpleCV, math
+import SimpleCV
+import sys
 
 DISPLAY_WIDTH = 640
 DISPLAY_HEIGHT = 480
 CENTER = (DISPLAY_WIDTH/2, DISPLAY_HEIGHT/2)
 MIN_AREA = 2500
 
-def run():
-
-	display = SimpleCV.Display()
-	cam = SimpleCV.Camera(0)
-	# address = "admin:admin@192.168.29.206:8081/video"
-	# cam = SimpleCV.JpegStreamCamera(address)
-	normaldisplay = 0
-	hull = False
-
-	while display.isNotDone():
-
-		if display.mouseRight:
-			normaldisplay = (normaldisplay + 1) % 2
-
-		if display.mouseLeft:
-			hull = not(hull)
-
-		img = cam.getImage().flipHorizontal()
-		
-		# Option 1
-		away_from_red = img.colorDistance((255,0,0))
-		only_red = img - away_from_red
-		segmented_red = only_red.erode(5).binarize().invert()
-		
-		biggest_blob = None
-		blobs = segmented_red.findBlobs()
-		if blobs:
-			squares = blobs.filter([b.isRectangle(0.13) for b in blobs])
-			if squares:
-				largest_square = squares[-1]
-				biggest_blob = largest_square
-				if largest_square.area() >= MIN_AREA:
-					width = largest_square.width()
-					height = largest_square.height()
-					x1 = largest_square.x - (width / 2)
-					y1 = largest_square.y - (height /2)
-
-					# Guidance 
-					vector_to_center(img, largest_square.centroid())
-					check_position(img, largest_square)
-					display_distance(img, largest_square)
-					# Use for convex hull instead of rectangle
-					if hull:
-						draw_hull(img, largest_square)
-					else:
-						img.drawRectangle(x1, y1, width, height, SimpleCV.Color.BLUE, 3)
-
-					img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)
-
-		display_overlay(img, biggest_blob, normaldisplay, segmented_red)
-			
 def display_overlay(img, biggest_blob, normaldisplay, segmented_red):
 	""" Displays the camera image in the display. Also sets up 
 			mouse clicks to switch between display modes 
@@ -108,6 +58,58 @@ def display_distance(img, blob):
 	text_layer.ezViewText(txt, (20,20), (0,0,0), (255,255,255))
 	img.addDrawingLayer(text_layer)
 
+def run(cam=SimpleCV.Camera(0)):
+	display = SimpleCV.Display()
+	normaldisplay = 0
+	hull = False
 
+	while display.isNotDone():
+		if display.mouseRight:
+			normaldisplay = (normaldisplay + 1) % 2
+		if display.mouseLeft:
+			hull = not(hull)
+		img = cam.getImage().flipHorizontal()
+		
+		# Option 1
+		away_from_red = img.colorDistance((255,0,0))
+		only_red = img - away_from_red
+		segmented_red = only_red.erode(5).binarize().invert()
+		
+		biggest_blob = None
+		blobs = segmented_red.findBlobs()
+		if blobs:
+			squares = blobs.filter([b.isRectangle(0.13) for b in blobs])
+			if squares:
+				largest_square = squares[-1]
+				biggest_blob = largest_square
+				if largest_square.area() >= MIN_AREA:
+					width = largest_square.width()
+					height = largest_square.height()
+					x1 = largest_square.x - (width / 2)
+					y1 = largest_square.y - (height /2)
 
-run()
+					# Guidance 
+					vector_to_center(img, largest_square.centroid())
+					check_position(img, largest_square)
+					display_distance(img, largest_square)
+					# Use for convex hull instead of rectangle
+					if hull:
+						draw_hull(img, largest_square)
+					else:
+						img.drawRectangle(x1, y1, width, height, SimpleCV.Color.BLUE, 3)
+
+					img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)
+
+		display_overlay(img, biggest_blob, normaldisplay, segmented_red)
+			
+
+if __name__ == "__main__":
+	if len(sys.argv) > 1:
+		if sys.argv[1] != "--ip":
+			print "System arguments: --ip [for web camera]"
+			exit(0)
+		address = "admin:admin@192.168.29.206:8081/video"
+		cam = SimpleCV.JpegStreamCamera(address)
+		run(cam)
+	else:
+		run()

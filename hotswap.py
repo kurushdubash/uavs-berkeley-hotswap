@@ -32,38 +32,38 @@ def display_border(img, color=(0,255,0), strength=15):
 def display_hull(img, blob):
 	""" Draws a convex hull of the blob. """
 	list_of_points = blob.hull()
-	# tempx = list_of_points[0][0]
-	# tempy = list_of_points[0][1]
-	# for x1,y1 in list_of_points:
-	# 	img.drawLine((tempx,tempy), (x1,y1), SimpleCV.Color.CYAN, 3)
-	# 	tempx=x1
-	# 	tempy=y1
+	tempx = list_of_points[0][0]
+	tempy = list_of_points[0][1]
+	for x1,y1 in list_of_points:
+		img.drawLine((tempx,tempy), (x1,y1), SimpleCV.Color.CYAN, 3)
+		tempx=x1
+		tempy=y1
 	# Experimental code to get sharp rectangle that works with orientation
 	# SUPER inneffient right now
-	largest = 0
-	point1 = None
-	point2 = None
-	point3 = None
-	point4 = None
-	for x,y in list_of_points:
-		for a,b in list_of_points:
-			if abs_distance((x,y), (a,b)) > largest:
-				largest = abs_distance((x,y), (a,b))
-				point1 = (x,y)
-				point2 = (a,b)
-	list_of_points.remove(point1)
-	list_of_points.remove(point2)
-	largest = 0
-	for x,y in list_of_points:
-		for a,b in list_of_points:
-			if abs_distance((x,y), (a,b)) > largest:
-				largest = abs_distance((x,y), (a,b))
-				point3 = (x,y)
-				point4 = (a,b)
-	img.drawCircle(point3, 3, SimpleCV.Color.BLUE, 3)
-	img.drawCircle(point4, 3, SimpleCV.Color.BLUE, 3)
-	img.drawCircle(point1, 3, SimpleCV.Color.BLUE, 3)
-	img.drawCircle(point2, 3, SimpleCV.Color.BLUE, 3)
+	# largest = 0
+	# point1 = None
+	# point2 = None
+	# point3 = None
+	# point4 = None
+	# for x,y in list_of_points:
+	# 	for a,b in list_of_points:
+	# 		if abs_distance((x,y), (a,b)) > largest:
+	# 			largest = abs_distance((x,y), (a,b))
+	# 			point1 = (x,y)
+	# 			point2 = (a,b)
+	# list_of_points.remove(point1)
+	# list_of_points.remove(point2)
+	# largest = 0
+	# for x,y in list_of_points:
+	# 	for a,b in list_of_points:
+	# 		if abs_distance((x,y), (a,b)) > largest:
+	# 			largest = abs_distance((x,y), (a,b))
+	# 			point3 = (x,y)
+	# 			point4 = (a,b)
+	# img.drawCircle(point3, 3, SimpleCV.Color.BLUE, 3)
+	# img.drawCircle(point4, 3, SimpleCV.Color.BLUE, 3)
+	# img.drawCircle(point1, 3, SimpleCV.Color.BLUE, 3)
+	# img.drawCircle(point2, 3, SimpleCV.Color.BLUE, 3)
 
 
 def display_distance(img, blob=None):

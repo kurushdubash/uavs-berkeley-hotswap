@@ -35,6 +35,60 @@ int emPin = 0; // change port
 
 int SONAR_ENGAGE_DIST = 10; //mm
 
+// Minimal class to replace std::vector
+template<typename Data>
+class Vector {
+  size_t d_size; // Stores no. of actually stored objects
+  size_t d_capacity; // Stores allocated capacity
+  Data *d_data; // Stores data
+  public:
+    Vector() : d_size(0), d_capacity(0), d_data(0) {}; // Default constructor
+    Vector(Vector const &other) : d_size(other.d_size), d_capacity(other.d_capacity), d_data(0) { d_data = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(d_data, other.d_data, d_size*sizeof(Data)); }; // Copy constuctor
+    ~Vector() { free(d_data); }; // Destructor
+    Vector &operator=(Vector const &other) { free(d_data); d_size = other.d_size; d_capacity = other.d_capacity; d_data = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(d_data, other.d_data, d_size*sizeof(Data)); return *this; }; // Needed for memory management
+    void push_back(Data const &x) { if (d_capacity == d_size) resize(); d_data[d_size++] = x; }; // Adds new value. If needed, allocates more space
+    size_t size() const { return d_size; }; // Size getter
+    Data const &operator[](size_t idx) const { return d_data[idx]; }; // Const getter
+    Data &operator[](size_t idx) { return d_data[idx]; }; // Changeable getter
+  private:
+    void resize() { d_capacity = d_capacity ? d_capacity*2 : 1; Data *newdata = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(newdata, d_data, d_size * sizeof(Data)); free(d_data); d_data = newdata; };// Allocates double the old space
+};
+
+int numIters = 10;
+//averaging window to average the last *numIters* values and 
+typedef struct AverageWindow {
+  Vector < double > distances;
+
+  void push(double distance){
+    distances.push_back(distance);
+    if (distances.size() > 100){
+      //memory allocation
+      Vector < double > temp;
+      //pop first element
+      for (int i = 1; i< distances.size(); i++){
+        temp.push_back(distances[i]);
+      }
+      distances = temp;
+    }
+  };
+  
+  double average(){
+    //average last 10 elements if more than 10 elements
+    int startIndex = 0;
+    if (distances.size() > numIters){
+      startIndex = distances.size() - numIters;
+    }
+
+    double sum = 0;
+    for (int i = startIndex; i < distances.size(); i++){
+      sum += distances[0];
+    }
+    return sum / (distances.size() - startIndex);
+  };
+};
+
+
+AverageWindow averageWindow;
 
 void setup()
 {
@@ -82,16 +136,17 @@ void loop() {
   Serial.print("Distance: ");
   Serial.println(distance);
 
-
+  //add to the averageWindow's storage
+  averageWindow.push(distance);
   
   switch (stage){
     /* Sonar detection when quad is within ___ mm */
     case 0:
-      if (distance < SONAR_ENGAGE_DIST){ //implement some averaging here
+      if (averageWindow.average() < SONAR_ENGAGE_DIST){ //when there has been a consistent sonar reading
         stage = 1;
       }
       break;
-      
+
   /* Electromagnets engage, move on when pressure sensors sense landing */
     case 1:
       digitalWrite(emPin, HIGH);

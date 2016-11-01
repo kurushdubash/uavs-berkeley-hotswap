@@ -1,4 +1,5 @@
 #include <Stepper.h>
+#include <QueueArray.h>
 /*
   UAVs@Berkeley HotSwap Project
   This module is for the hexacopter landing pad.
@@ -9,8 +10,6 @@
 // LEDs will be used as on-board indicators
 int LED_GREEN = 7; // Set green LED pin to 7
 int LED_RED = 5; // Set red LED pin to 5
-
-
 
 // Motor is used for screwing in our battery
 // initialize the stepper library on pins 8 through 11:
@@ -34,61 +33,6 @@ int echoPin = 11;
 int emPin = 0; // change port
 
 int SONAR_ENGAGE_DIST = 10; //mm
-
-// Minimal class to replace std::vector
-template<typename Data>
-class Vector {
-  size_t d_size; // Stores no. of actually stored objects
-  size_t d_capacity; // Stores allocated capacity
-  Data *d_data; // Stores data
-  public:
-    Vector() : d_size(0), d_capacity(0), d_data(0) {}; // Default constructor
-    Vector(Vector const &other) : d_size(other.d_size), d_capacity(other.d_capacity), d_data(0) { d_data = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(d_data, other.d_data, d_size*sizeof(Data)); }; // Copy constuctor
-    ~Vector() { free(d_data); }; // Destructor
-    Vector &operator=(Vector const &other) { free(d_data); d_size = other.d_size; d_capacity = other.d_capacity; d_data = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(d_data, other.d_data, d_size*sizeof(Data)); return *this; }; // Needed for memory management
-    void push_back(Data const &x) { if (d_capacity == d_size) resize(); d_data[d_size++] = x; }; // Adds new value. If needed, allocates more space
-    size_t size() const { return d_size; }; // Size getter
-    Data const &operator[](size_t idx) const { return d_data[idx]; }; // Const getter
-    Data &operator[](size_t idx) { return d_data[idx]; }; // Changeable getter
-  private:
-    void resize() { d_capacity = d_capacity ? d_capacity*2 : 1; Data *newdata = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(newdata, d_data, d_size * sizeof(Data)); free(d_data); d_data = newdata; };// Allocates double the old space
-};
-
-int numIters = 10;
-//averaging window to average the last *numIters* values and 
-typedef struct AverageWindow {
-  Vector < double > distances;
-
-  void push(double distance){
-    distances.push_back(distance);
-    if (distances.size() > 100){
-      //memory allocation
-      Vector < double > temp;
-      //pop first element
-      for (int i = 1; i< distances.size(); i++){
-        temp.push_back(distances[i]);
-      }
-      distances = temp;
-    }
-  };
-  
-  double average(){
-    //average last 10 elements if more than 10 elements
-    int startIndex = 0;
-    if (distances.size() > numIters){
-      startIndex = distances.size() - numIters;
-    }
-
-    double sum = 0;
-    for (int i = startIndex; i < distances.size(); i++){
-      sum += distances[0];
-    }
-    return sum / (distances.size() - startIndex);
-  };
-};
-
-
-AverageWindow averageWindow;
 
 void setup()
 {
@@ -131,92 +75,130 @@ void loop() {
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
-  distance = (duration / 2) / 2.91; //74=inches, 29.1=cm, 2.91=mm
+  distance = (duration / 2) / 29.1; //74=inches, 29.1=cm, 2.91=mm
+
 
   Serial.print("Distance: ");
-  Serial.println(distance);
+  Serial.print(distance);
+  Serial.println(" cm");
 
-  //add to the averageWindow's storage
-  averageWindow.push(distance);
+  quadInRange(distance);
+
+//  
+//  switch (stage){
+//    /* Sonar detection when quad is within ___ mm */
+//    case 0:
+//      if (quadInRange(distance)){ //when there has been a consistent sonar reading
+//        stage = 1;
+//      }
+//      break;
+
+  // /* Electromagnets engage, move on when pressure sensors sense landing */
+  //   case 1:
+  //     digitalWrite(emPin, HIGH);
+  //     delay(1000); // for now just wait a second, instead of pressure sensors
+  //     stage = 2;
+  //     break;
+  // /* Landing happens now -- DEFINITELY */
+
+  // /* Push in stepper motor with belt_dc */
+  //   case 2:
+  //     digitalWrite(belt_dc_dir, HIGH); //clockwise
+  //     analogWrite(belt_dc_pwm, 100); //in
+  //     delay(500);
+  //     analogWrite(belt_dc_pwm, 0);
+  //     stage = 3;
+  //     break;
   
-  switch (stage){
-    /* Sonar detection when quad is within ___ mm */
-    case 0:
-      if (averageWindow.average() < SONAR_ENGAGE_DIST){ //when there has been a consistent sonar reading
-        stage = 1;
-      }
-      break;
-
-  /* Electromagnets engage, move on when pressure sensors sense landing */
-    case 1:
-      digitalWrite(emPin, HIGH);
-      delay(1000); // for now just wait a second, instead of pressure sensors
-      stage = 2;
-      break;
-  /* Landing happens now -- DEFINITELY */
-
-  /* Push in stepper motor with belt_dc */
-    case 2:
-      digitalWrite(belt_dc_dir, HIGH); //clockwise
-      analogWrite(belt_dc_pwm, 100); //in
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 3;
-      break;
-  
-  /* Stepper motor unscrews */
-    case 3:
-      stepper_motor.step(-2*steps_per_rev);
-      delay(500);
-      stage = 4;
-      break;
+  // /* Stepper motor unscrews */
+  //   case 3:
+  //     stepper_motor.step(-2*steps_per_rev);
+  //     delay(500);
+  //     stage = 4;
+  //     break;
       
-  /* Push out stepper motor with belt_dc */
-    case 4:
-      digitalWrite(belt_dc_dir, LOW); //counter clockwise
-      analogWrite(belt_dc_pwm, 100); //out
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 5;
-      break;
-  /* Magazine loads new pack on treadmill */
+  // /* Push out stepper motor with belt_dc */
+  //   case 4:
+  //     digitalWrite(belt_dc_dir, LOW); //counter clockwise
+  //     analogWrite(belt_dc_pwm, 100); //out
+  //     delay(500);
+  //     analogWrite(belt_dc_pwm, 0);
+  //     stage = 5;
+  //     break;
+  // /* Magazine loads new pack on treadmill */
   
-  /* DC motor treadmill slide battery in */
-    case 5:
-      digitalWrite(treadmill_dc_dir, HIGH);
-      analogWrite(treadmill_dc_pwm, 80); //moves treadmill
-      delay(1000);
-      analogWrite(treadmill_dc_pwm, 0);
-      stage = 6;
-      break;
-  /* Push in stepper motor with belt_dc */
-    case 6:
-      digitalWrite(belt_dc_dir, HIGH); //clockwise
-      analogWrite(belt_dc_pwm, 100);
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 7;
-      break;
-  /* Stepper motor screws in */
-    case 7:
-      stepper_motor.step(2*steps_per_rev); //two rotations
-      delay(500);
-      stage = 8;
-      break;
-  /* Push out stepper motor with belt_dc */
-    case 8:
-      digitalWrite(belt_dc_dir, LOW); //counter-clockwise
-      analogWrite(belt_dc_pwm, 100);
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 9;
-      break;
-  /* Electromagnets disengage */
-    case 9:
-      digitalWrite(emPin, LOW);
-      stage = 0; //stop and wait again
-      break;
-  /* Take off */
-  }
+  // /* DC motor treadmill slide battery in */
+  //   case 5:
+  //     digitalWrite(treadmill_dc_dir, HIGH);
+  //     analogWrite(treadmill_dc_pwm, 80); //moves treadmill
+  //     delay(1000);
+  //     analogWrite(treadmill_dc_pwm, 0);
+  //     stage = 6;
+  //     break;
+  // /* Push in stepper motor with belt_dc */
+  //   case 6:
+  //     digitalWrite(belt_dc_dir, HIGH); //clockwise
+  //     analogWrite(belt_dc_pwm, 100);
+  //     delay(500);
+  //     analogWrite(belt_dc_pwm, 0);
+  //     stage = 7;
+  //     break;
+  // /* Stepper motor screws in */
+  //   case 7:
+  //     stepper_motor.step(2*steps_per_rev); //two rotations
+  //     delay(500);
+  //     stage = 8;
+  //     break;
+  // /* Push out stepper motor with belt_dc */
+  //   case 8:
+  //     digitalWrite(belt_dc_dir, LOW); //counter-clockwise
+  //     analogWrite(belt_dc_pwm, 100);
+  //     delay(500);
+  //     analogWrite(belt_dc_pwm, 0);
+  //     stage = 9;
+  //     break;
+  // /* Electromagnets disengage */
+  //   case 9:
+  //     digitalWrite(emPin, LOW);
+  //     stage = 0; //stop and wait again
+  //     break;
+  // /* Take off */
+  // }
 
 }
+
+QueueArray <int> distances;
+int SONOAR_DIST_THRESH = 16;
+boolean quadInRange(int distance){
+  if (distances.count() < 10){ // Not enough data stored yet
+    distances.enqueue(distance);
+    return false;      
+  }
+  distances.enqueue(distance);
+  distances.dequeue();
+
+  int tempDistances[10];
+  int count = 0;
+  double average = 0;
+  while (count < 10){
+    int value = distances.dequeue();
+    average += value;
+    tempDistances[count] = value; 
+    count++;
+  }
+  average = average / 10;
+  count = 0;
+  while (count < 10){
+    distances.enqueue(tempDistances[count]);
+    count++;
+  }
+  if (average < SONOAR_DIST_THRESH){
+    Serial.print("Quad in range...");
+    Serial.print(average);
+    Serial.println(" cm");
+    return true;
+  }
+  return false; 
+}
+
+

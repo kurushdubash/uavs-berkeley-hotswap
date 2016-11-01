@@ -36,7 +36,7 @@ int SONAR_ENGAGE_DIST = 10; //mm
 
 void setup()
 {
-  Serial.println("Booting up...");
+  Serial.print("Booting up...");
   // start the serial monitor
   Serial.begin(9600);
 
@@ -59,9 +59,8 @@ void setup()
   pinMode(emPin, OUTPUT);
   digitalWrite(emPin, LOW);
   
-  Serial.println("Boot complete!"); 
-
-  stage = 0;
+  Serial.println("BOOT COMPLETE."); 
+  Serial.print("Looking for quad...");
 }
 
 
@@ -94,13 +93,13 @@ boolean quadInRange(int distance){
     distances.enqueue(distance);
     return false;      
   }
-  distances.enqueue(distance);
-  distances.dequeue();
+  distances.enqueue(distance); // Store new distance
+  distances.dequeue(); // Pop oldest item
 
   double tempDistances[10];
   int count = 0;
   double average = 0;
-  while (count < 10){
+  while (count < 10){ // Calculate average
     double value = distances.dequeue();
     average += value;
     tempDistances[count] = value; 
@@ -108,12 +107,12 @@ boolean quadInRange(int distance){
   }
   average = average / 10;
   count = 0;
-  while (count < 10){
+  while (count < 10){ // Store items again
     distances.enqueue(tempDistances[count]);
     count++;
   }
   if (average < SONOAR_DIST_THRESH){
-    Serial.print("Quad in range...");
+    Serial.print("QUAD IN RANGE. ");
     Serial.print(average);
     Serial.println(" cm");
     return true;
@@ -124,59 +123,80 @@ boolean quadInRange(int distance){
 boolean quadHasLanded(){
   // Read Pressure sensor data here:
   // If pressure = quad has landed
+  Serial.println("LANDED.");
   // return true
-  return false;
+  return true;
 }
 
 void performSwap(){
 
   /* Electromagnets engage, move on when pressure sensors sense landing */
+    Serial.print("Turning on electro magnets...");
     digitalWrite(emPin, HIGH);
-    delay(1000); // for now just wait a second, instead of pressure sensors
+    Serial.println("ON.");
+    Serial.print("Waiting for quad to land...");
     while(!quadHasLanded());
   /* Landing happens now -- DEFINITELY */
 
   /* Push in stepper motor with belt_dc */
+    Serial.print("Pushing in stepper motor...");
     digitalWrite(belt_dc_dir, HIGH); //clockwise
     analogWrite(belt_dc_pwm, 100); //in
     delay(500);
     analogWrite(belt_dc_pwm, 0);
+    Serial.println("PUSHED.");
   
   /* Stepper motor unscrews */
+    Serial.print("Unscrewing...");
     stepper_motor.step(-2*steps_per_rev);
     delay(500);
+    Serial.println("UNSCREWED.");
       
   /* Push out stepper motor with belt_dc */
+    Serial.print("Turning on electro magnets...");
     digitalWrite(belt_dc_dir, LOW); //counter clockwise
     analogWrite(belt_dc_pwm, 100); //out
     delay(500);
     analogWrite(belt_dc_pwm, 0);
+    Serial.println("ON.");
+
   /* Magazine loads new pack on treadmill */
   
   /* DC motor treadmill slide battery in */
+    Serial.print("Sliding in battery...");
     digitalWrite(treadmill_dc_dir, HIGH);
     analogWrite(treadmill_dc_pwm, 80); //moves treadmill
     delay(1000);
     analogWrite(treadmill_dc_pwm, 0);
+    Serial.println("IN.");
 
   /* Push in stepper motor with belt_dc */
+    Serial.print("Push in stepper motor...");
     digitalWrite(belt_dc_dir, HIGH); //clockwise
     analogWrite(belt_dc_pwm, 100);
     delay(500);
     analogWrite(belt_dc_pwm, 0);
+    Serial.println("PUSHED.");
 
   /* Stepper motor screws in */
+    Serial.print("Screwing in...");
     stepper_motor.step(2*steps_per_rev); //two rotations
     delay(500);
+    Serial.println("IN.");
 
   /* Push out stepper motor with belt_dc */
+    Serial.print("Pushing out stepper motor...");
     digitalWrite(belt_dc_dir, LOW); //counter-clockwise
     analogWrite(belt_dc_pwm, 100);
     delay(500);
     analogWrite(belt_dc_pwm, 0);
+    Serial.println("OUT.");
 
   /* Electromagnets disengage */
+    Serial.print("Turning off electro magnets...");
     digitalWrite(emPin, LOW);
+    Serial.println("OFF.");
+    delay(1000);
+    Serial.print("Looking for quad..."); // Restart our loop
   /* Take off */
 }
-

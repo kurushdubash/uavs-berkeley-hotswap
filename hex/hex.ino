@@ -115,6 +115,11 @@ boolean quadInRange(int distance){
     Serial.print("QUAD IN RANGE. ");
     Serial.print(average);
     Serial.println(" cm");
+    int count = 0;
+    while(count < 10){ // Empty our distances queue so next time we have fresh data
+      distances.dequeue();
+      count++;
+    }
     return true;
   }
   return false; 
@@ -196,7 +201,7 @@ void performSwap(){
     Serial.print("Turning off electro magnets...");
     digitalWrite(emPin, LOW);
     Serial.println("OFF.");
-    delay(1000);
+    delay(10000); // Sleep 10 seconds to start our search
     Serial.print("Looking for quad..."); // Restart our loop
   /* Take off */
 }

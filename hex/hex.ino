@@ -68,7 +68,7 @@ void setup()
 void loop() {
   // this figures out the distance the ultrasonic sees in milimeters
   long duration;
-  long distance;
+  double distance;
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
@@ -77,98 +77,18 @@ void loop() {
   duration = pulseIn(echoPin, HIGH);
   distance = (duration / 2) / 29.1; //74=inches, 29.1=cm, 2.91=mm
 
+  // Serial.print("Distance: ");
+  // Serial.print(distance);
+  // Serial.println(" cm");
 
-  Serial.print("Distance: ");
-  Serial.print(distance);
-  Serial.println(" cm");
-
-  quadInRange(distance);
-
-//  
-//  switch (stage){
-//    /* Sonar detection when quad is within ___ mm */
-//    case 0:
-//      if (quadInRange(distance)){ //when there has been a consistent sonar reading
-//        stage = 1;
-//      }
-//      break;
-
-  // /* Electromagnets engage, move on when pressure sensors sense landing */
-  //   case 1:
-  //     digitalWrite(emPin, HIGH);
-  //     delay(1000); // for now just wait a second, instead of pressure sensors
-  //     stage = 2;
-  //     break;
-  // /* Landing happens now -- DEFINITELY */
-
-  // /* Push in stepper motor with belt_dc */
-  //   case 2:
-  //     digitalWrite(belt_dc_dir, HIGH); //clockwise
-  //     analogWrite(belt_dc_pwm, 100); //in
-  //     delay(500);
-  //     analogWrite(belt_dc_pwm, 0);
-  //     stage = 3;
-  //     break;
-  
-  // /* Stepper motor unscrews */
-  //   case 3:
-  //     stepper_motor.step(-2*steps_per_rev);
-  //     delay(500);
-  //     stage = 4;
-  //     break;
-      
-  // /* Push out stepper motor with belt_dc */
-  //   case 4:
-  //     digitalWrite(belt_dc_dir, LOW); //counter clockwise
-  //     analogWrite(belt_dc_pwm, 100); //out
-  //     delay(500);
-  //     analogWrite(belt_dc_pwm, 0);
-  //     stage = 5;
-  //     break;
-  // /* Magazine loads new pack on treadmill */
-  
-  // /* DC motor treadmill slide battery in */
-  //   case 5:
-  //     digitalWrite(treadmill_dc_dir, HIGH);
-  //     analogWrite(treadmill_dc_pwm, 80); //moves treadmill
-  //     delay(1000);
-  //     analogWrite(treadmill_dc_pwm, 0);
-  //     stage = 6;
-  //     break;
-  // /* Push in stepper motor with belt_dc */
-  //   case 6:
-  //     digitalWrite(belt_dc_dir, HIGH); //clockwise
-  //     analogWrite(belt_dc_pwm, 100);
-  //     delay(500);
-  //     analogWrite(belt_dc_pwm, 0);
-  //     stage = 7;
-  //     break;
-  // /* Stepper motor screws in */
-  //   case 7:
-  //     stepper_motor.step(2*steps_per_rev); //two rotations
-  //     delay(500);
-  //     stage = 8;
-  //     break;
-  // /* Push out stepper motor with belt_dc */
-  //   case 8:
-  //     digitalWrite(belt_dc_dir, LOW); //counter-clockwise
-  //     analogWrite(belt_dc_pwm, 100);
-  //     delay(500);
-  //     analogWrite(belt_dc_pwm, 0);
-  //     stage = 9;
-  //     break;
-  // /* Electromagnets disengage */
-  //   case 9:
-  //     digitalWrite(emPin, LOW);
-  //     stage = 0; //stop and wait again
-  //     break;
-  // /* Take off */
-  // }
-
+  if(quadInRange(distance)){
+    performSwap();
+  }
+  // delay(1000);
 }
 
-QueueArray <int> distances;
-int SONOAR_DIST_THRESH = 16;
+QueueArray <double> distances;
+double SONOAR_DIST_THRESH = 16;
 boolean quadInRange(int distance){
   if (distances.count() < 10){ // Not enough data stored yet
     distances.enqueue(distance);
@@ -177,11 +97,11 @@ boolean quadInRange(int distance){
   distances.enqueue(distance);
   distances.dequeue();
 
-  int tempDistances[10];
+  double tempDistances[10];
   int count = 0;
   double average = 0;
   while (count < 10){
-    int value = distances.dequeue();
+    double value = distances.dequeue();
     average += value;
     tempDistances[count] = value; 
     count++;
@@ -201,4 +121,62 @@ boolean quadInRange(int distance){
   return false; 
 }
 
+boolean quadHasLanded(){
+  // Read Pressure sensor data here:
+  // If pressure = quad has landed
+  // return true
+  return false;
+}
+
+void performSwap(){
+
+  /* Electromagnets engage, move on when pressure sensors sense landing */
+    digitalWrite(emPin, HIGH);
+    delay(1000); // for now just wait a second, instead of pressure sensors
+    while(!quadHasLanded());
+  /* Landing happens now -- DEFINITELY */
+
+  /* Push in stepper motor with belt_dc */
+    digitalWrite(belt_dc_dir, HIGH); //clockwise
+    analogWrite(belt_dc_pwm, 100); //in
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+  
+  /* Stepper motor unscrews */
+    stepper_motor.step(-2*steps_per_rev);
+    delay(500);
+      
+  /* Push out stepper motor with belt_dc */
+    digitalWrite(belt_dc_dir, LOW); //counter clockwise
+    analogWrite(belt_dc_pwm, 100); //out
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+  /* Magazine loads new pack on treadmill */
+  
+  /* DC motor treadmill slide battery in */
+    digitalWrite(treadmill_dc_dir, HIGH);
+    analogWrite(treadmill_dc_pwm, 80); //moves treadmill
+    delay(1000);
+    analogWrite(treadmill_dc_pwm, 0);
+
+  /* Push in stepper motor with belt_dc */
+    digitalWrite(belt_dc_dir, HIGH); //clockwise
+    analogWrite(belt_dc_pwm, 100);
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+
+  /* Stepper motor screws in */
+    stepper_motor.step(2*steps_per_rev); //two rotations
+    delay(500);
+
+  /* Push out stepper motor with belt_dc */
+    digitalWrite(belt_dc_dir, LOW); //counter-clockwise
+    analogWrite(belt_dc_pwm, 100);
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+
+  /* Electromagnets disengage */
+    digitalWrite(emPin, LOW);
+  /* Take off */
+}
 

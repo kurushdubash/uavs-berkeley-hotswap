@@ -30,7 +30,7 @@ int trigPin = 12; // intialize trigPin to 12 & echoPin to 11
 int echoPin = 11;
 
 //electromagnet
-int emPin = 0; // change port
+int emPin = 7; // change port
 
 int SONAR_ENGAGE_DIST = 10; //mm
 

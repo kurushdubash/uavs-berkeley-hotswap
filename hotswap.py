@@ -8,8 +8,8 @@ CENTER = (DISPLAY_WIDTH/2, DISPLAY_HEIGHT/2)
 MIN_AREA = 2500
 
 def display_overlay(img, biggest_blob, normaldisplay, segmented_red):
-	""" Displays the camera image in the display. Also sets up 
-			mouse clicks to switch between display modes 
+	""" Displays the camera image in the display. Also sets up
+			mouse clicks to switch between display modes
 	"""
 	img.drawCircle(CENTER, 3, SimpleCV.Color.BLUE, 3)
 	if normaldisplay == 1:
@@ -20,7 +20,7 @@ def display_overlay(img, biggest_blob, normaldisplay, segmented_red):
 		img.show()
 
 def display_vector_to_center(img, x_y, color=(0,255,0), strength=5, varying_strength=True):
-	""" Draws a vector to the center of the screen to indicate how far from the 
+	""" Draws a vector to the center of the screen to indicate how far from the
 		center we are
 	"""
 	img.drawLine(x_y, CENTER, color, strength)
@@ -67,17 +67,25 @@ def display_hull(img, blob):
 
 
 def display_distance(img, blob=None):
-	""" Draws text on the img layer displaying the distance from the object. """ 
-	# TODO FIGURE OUT DISANCE:
-	txt = "Distance: N/A" 
+	""" Draws text on the img layer displaying the distance from the object. """
+
+	knownWidth = 9.5 #width of your target in inches (can change to any unit)
+	focalLength = 586.285714286 #focal length of your camera, run calibration.py to calculate this
+
+	#if there is a blob, then take its width in pixels and calculate the distance of the object from the camera in feet
 	if blob:
-		txt = "Distance: " + str(blob.area())
+		pixWidth = blob.minRectWidth()
+		distance = (knownWidth * focalLength) / pixWidth / 12
+		txt = "Distance: " + str(distance) + " feet"
+	else:
+		txt = "Distance: N/A"
+
 	text_layer = SimpleCV.DrawingLayer((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 	text_layer.ezViewText(txt, (20,20), (0,0,0), (255,255,255))
 	img.addDrawingLayer(text_layer)
 
 def display_orientation(img, blob=None):
-	""" Draws text on the img layer displaying the orientation from the object. """ 
+	""" Draws text on the img layer displaying the orientation from the object. """
 	# TODO FIGURE OUT Orientation:
 	txt = "Orientation: N/A"
 	if blob:
@@ -91,10 +99,10 @@ def abs_distance(tuple1, tuple2):
 	""" Returns the absolute difference between point of tuple1 and tuple2 """
 	return ((tuple2[0] - tuple1[0]) ** 2 + (tuple2[1] - tuple1[1]) ** 2) ** (0.5)
 
-def check_position(img, blob):	
+def check_position(img, blob):
 	""" If the center of our screen is in the largest blob, we turn the border green.
 		If not but we turn the screen red.
-	"""				
+	"""
 	if blob.contains(CENTER):
 		display_border(img)
 	else:
@@ -110,7 +118,7 @@ def run(cam=SimpleCV.Camera(0), display=SimpleCV.Display()):
 		if display.mouseLeft:
 			hull = not(hull)
 		img = cam.getImage().flipHorizontal()
-		
+
 		# Option 1
 		away_from_red = img.colorDistance((255,0,0))
 		only_red = img - away_from_red
@@ -118,7 +126,7 @@ def run(cam=SimpleCV.Camera(0), display=SimpleCV.Display()):
 
 		display_distance(img)
 		display_orientation(img)
-		
+
 		biggest_blob = None
 		blobs = segmented_red.findBlobs()
 		if blobs:
@@ -135,7 +143,7 @@ def run(cam=SimpleCV.Camera(0), display=SimpleCV.Display()):
 					display_distance(img, largest_square)
 					display_orientation(img, largest_square)
 
-					# Guidance 
+					# Guidance
 					display_vector_to_center(img, largest_square.centroid())
 					check_position(img, largest_square)
 					# Use for convex hull instead of rectangle
@@ -148,7 +156,7 @@ def run(cam=SimpleCV.Camera(0), display=SimpleCV.Display()):
 					# Center of blob
 					img.drawCircle((largest_square.x,largest_square.y), 3, SimpleCV.Color.BLUE, 3)
 		display_overlay(img, biggest_blob, normaldisplay, segmented_red)
-			
+
 
 if __name__ == "__main__":
 	display = SimpleCV.Display()

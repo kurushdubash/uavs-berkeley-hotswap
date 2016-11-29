@@ -1,4 +1,8 @@
 #include <Stepper.h>
+#include <QueueArray.h>
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+#include "utility/Adafruit_MS_PWMServoDriver.h"
 /*
   UAVs@Berkeley HotSwap Project
   This module is for the hexacopter landing pad.
@@ -10,13 +14,12 @@
 int LED_GREEN = 7; // Set green LED pin to 7
 int LED_RED = 5; // Set red LED pin to 5
 
-
-
 // Motor is used for screwing in our battery
 // initialize the stepper library on pins 8 through 11:
 int steps_per_rev = 200;
-Stepper stepper_motor(steps_per_rev, 8, 9, 10, 11); //change for actual stepper
-
+Stepper stepper_motor(steps_per_rev, 0,1,2,3); //change for actual stepper
+Adafruit_MotorShield AFMS; 
+Adafruit_StepperMotor *stepper;
 //directions and pwm's
 int treadmill_dc_dir = 0; 
 int treadmill_dc_pwm = 0;
@@ -27,72 +30,26 @@ int belt_dc_pwm = 0;
 int stage = 0;
 
 // Optional: Ultra-sonic sensor for triggering when drone is in position
-int trigPin = 12; // intialize trigPin to 12 & echoPin to 11
-int echoPin = 11;
+int trigPin = 11; // intialize trig Pin to 12 & echoPin to 11
+int echoPin = 12;
 
 //electromagnet
-int emPin = 0; // change port
+int emPin = 9; // change port
 
 int SONAR_ENGAGE_DIST = 10; //mm
 
-// Minimal class to replace std::vector
-template<typename Data>
-class Vector {
-  size_t d_size; // Stores no. of actually stored objects
-  size_t d_capacity; // Stores allocated capacity
-  Data *d_data; // Stores data
-  public:
-    Vector() : d_size(0), d_capacity(0), d_data(0) {}; // Default constructor
-    Vector(Vector const &other) : d_size(other.d_size), d_capacity(other.d_capacity), d_data(0) { d_data = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(d_data, other.d_data, d_size*sizeof(Data)); }; // Copy constuctor
-    ~Vector() { free(d_data); }; // Destructor
-    Vector &operator=(Vector const &other) { free(d_data); d_size = other.d_size; d_capacity = other.d_capacity; d_data = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(d_data, other.d_data, d_size*sizeof(Data)); return *this; }; // Needed for memory management
-    void push_back(Data const &x) { if (d_capacity == d_size) resize(); d_data[d_size++] = x; }; // Adds new value. If needed, allocates more space
-    size_t size() const { return d_size; }; // Size getter
-    Data const &operator[](size_t idx) const { return d_data[idx]; }; // Const getter
-    Data &operator[](size_t idx) { return d_data[idx]; }; // Changeable getter
-  private:
-    void resize() { d_capacity = d_capacity ? d_capacity*2 : 1; Data *newdata = (Data *)malloc(d_capacity*sizeof(Data)); memcpy(newdata, d_data, d_size * sizeof(Data)); free(d_data); d_data = newdata; };// Allocates double the old space
-};
-
-int numIters = 10;
-//averaging window to average the last *numIters* values and 
-typedef struct AverageWindow {
-  Vector < double > distances;
-
-  void push(double distance){
-    distances.push_back(distance);
-    if (distances.size() > 100){
-      //memory allocation
-      Vector < double > temp;
-      //pop first element
-      for (int i = 1; i< distances.size(); i++){
-        temp.push_back(distances[i]);
-      }
-      distances = temp;
-    }
-  };
-  
-  double average(){
-    //average last 10 elements if more than 10 elements
-    int startIndex = 0;
-    if (distances.size() > numIters){
-      startIndex = distances.size() - numIters;
-    }
-
-    double sum = 0;
-    for (int i = startIndex; i < distances.size(); i++){
-      sum += distances[0];
-    }
-    return sum / (distances.size() - startIndex);
-  };
-};
-
-
-AverageWindow averageWindow;
-
 void setup()
 {
-  Serial.println("Booting up...");
+  
+  // intialize motors 
+  //  stepper_motor.setSpeed(60);
+
+  AFMS = Adafruit_MotorShield();
+  AFMS.begin();
+  stepper = AFMS.getStepper(768, 1);
+  stepper->setSpeed(100);
+  
+  Serial.print("Booting up...");
   // start the serial monitor
   Serial.begin(9600);
 
@@ -100,8 +57,6 @@ void setup()
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
 
-  // intialize motors 
-  stepper_motor.setSpeed(60);
   pinMode(belt_dc_dir, OUTPUT);
   pinMode(treadmill_dc_dir, OUTPUT);
   pinMode(belt_dc_pwm, OUTPUT);
@@ -115,108 +70,161 @@ void setup()
   pinMode(emPin, OUTPUT);
   digitalWrite(emPin, LOW);
   
-  Serial.println("Boot complete!"); 
-
-  stage = 0;
+  Serial.println("BOOT COMPLETE."); 
+  Serial.print("Looking for quad...");
 }
 
 
 void loop() {
   // this figures out the distance the ultrasonic sees in milimeters
   long duration;
-  long distance;
+  double distance;
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH);
-  distance = (duration / 2) / 2.91; //74=inches, 29.1=cm, 2.91=mm
+  distance = (duration / 2) / 29.1; //74=inches, 29.1=cm, 2.91=mm
 
-  Serial.print("Distance: ");
-  Serial.println(distance);
+//  stepper_motor.step(1);
+//  
+   Serial.print("Distance: ");
+   Serial.print(distance);
+   Serial.println(" cm");
 
-  //add to the averageWindow's storage
-  averageWindow.push(distance);
+  if(quadInRange(distance)){
+//    performSwap();
+
+    digitalWrite(emPin, HIGH);
+    
+    stepper->setSpeed(1600);
+    stepper->step(50, FORWARD, DOUBLE);
+    Serial.println("ENGAGING EM");
+  }
+  else{
+    digitalWrite(emPin, LOW);
+  }
   
-  switch (stage){
-    /* Sonar detection when quad is within ___ mm */
-    case 0:
-      if (averageWindow.average() < SONAR_ENGAGE_DIST){ //when there has been a consistent sonar reading
-        stage = 1;
-      }
-      break;
+}
+
+QueueArray <double> distances;
+double SONOAR_DIST_THRESH = 3.0;
+boolean quadInRange(int distance){
+  if (distances.count() < 15){ // Not enough data stored yet
+    distances.enqueue(distance);
+    return false;      
+  }
+  distances.enqueue(distance); // Store new distance
+  distances.dequeue(); // Pop oldest item
+
+  double tempDistances[15];
+  int count = 0;
+  double average = 0;
+  while (count < 15){ // Calculate average
+    double value = distances.dequeue();
+    average += value;
+    tempDistances[count] = value; 
+    count++;
+  }
+  average = average / 15.0;
+  count = 0;
+  while (count < 15){ // Store items again
+    distances.enqueue(tempDistances[count]);
+    count++;
+  }
+  
+  if (average < SONOAR_DIST_THRESH){
+//    int count = 0;
+//    while(count < 30){ // Empty our distances queue so next time we have fresh data
+//      distances.dequeue();
+//      count++;
+//    }
+  Serial.print("QUAD IN RANGE. ");
+  Serial.print(average);
+  Serial.println(" cm");
+    return true;
+  }
+  return false; 
+}
+
+boolean quadHasLanded(){
+  // Read Pressure sensor data here:
+  // If pressure = quad has landed
+  Serial.println("LANDED.");
+  // return true
+  return true;
+}
+
+void performSwap(){
 
   /* Electromagnets engage, move on when pressure sensors sense landing */
-    case 1:
-      digitalWrite(emPin, HIGH);
-      delay(1000); // for now just wait a second, instead of pressure sensors
-      stage = 2;
-      break;
+    Serial.print("Turning on electro magnets...");
+    digitalWrite(emPin, HIGH);
+    Serial.println("ON.");
+    Serial.print("Waiting for quad to land...");
+    while(!quadHasLanded());
   /* Landing happens now -- DEFINITELY */
 
   /* Push in stepper motor with belt_dc */
-    case 2:
-      digitalWrite(belt_dc_dir, HIGH); //clockwise
-      analogWrite(belt_dc_pwm, 100); //in
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 3;
-      break;
+    Serial.print("Pushing in stepper motor...");
+    digitalWrite(belt_dc_dir, HIGH); //clockwise
+    analogWrite(belt_dc_pwm, 100); //in
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+    Serial.println("PUSHED.");
   
   /* Stepper motor unscrews */
-    case 3:
-      stepper_motor.step(-2*steps_per_rev);
-      delay(500);
-      stage = 4;
-      break;
+    Serial.print("Unscrewing...");
+    stepper_motor.step(-2*steps_per_rev);
+    delay(500);
+    Serial.println("UNSCREWED.");
       
   /* Push out stepper motor with belt_dc */
-    case 4:
-      digitalWrite(belt_dc_dir, LOW); //counter clockwise
-      analogWrite(belt_dc_pwm, 100); //out
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 5;
-      break;
+    Serial.print("Turning on electro magnets...");
+    digitalWrite(belt_dc_dir, LOW); //counter clockwise
+    analogWrite(belt_dc_pwm, 100); //out
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+    Serial.println("ON.");
+
   /* Magazine loads new pack on treadmill */
   
   /* DC motor treadmill slide battery in */
-    case 5:
-      digitalWrite(treadmill_dc_dir, HIGH);
-      analogWrite(treadmill_dc_pwm, 80); //moves treadmill
-      delay(1000);
-      analogWrite(treadmill_dc_pwm, 0);
-      stage = 6;
-      break;
-  /* Push in stepper motor with belt_dc */
-    case 6:
-      digitalWrite(belt_dc_dir, HIGH); //clockwise
-      analogWrite(belt_dc_pwm, 100);
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 7;
-      break;
-  /* Stepper motor screws in */
-    case 7:
-      stepper_motor.step(2*steps_per_rev); //two rotations
-      delay(500);
-      stage = 8;
-      break;
-  /* Push out stepper motor with belt_dc */
-    case 8:
-      digitalWrite(belt_dc_dir, LOW); //counter-clockwise
-      analogWrite(belt_dc_pwm, 100);
-      delay(500);
-      analogWrite(belt_dc_pwm, 0);
-      stage = 9;
-      break;
-  /* Electromagnets disengage */
-    case 9:
-      digitalWrite(emPin, LOW);
-      stage = 0; //stop and wait again
-      break;
-  /* Take off */
-  }
+    Serial.print("Sliding in battery...");
+    digitalWrite(treadmill_dc_dir, HIGH);
+    analogWrite(treadmill_dc_pwm, 80); //moves treadmill
+    delay(1000);
+    analogWrite(treadmill_dc_pwm, 0);
+    Serial.println("IN.");
 
+  /* Push in stepper motor with belt_dc */
+    Serial.print("Push in stepper motor...");
+    digitalWrite(belt_dc_dir, HIGH); //clockwise
+    analogWrite(belt_dc_pwm, 100);
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+    Serial.println("PUSHED.");
+
+  /* Stepper motor screws in */
+    Serial.print("Screwing in...");
+    stepper_motor.step(2*steps_per_rev); //two rotations
+    delay(500);
+    Serial.println("IN.");
+
+  /* Push out stepper motor with belt_dc */
+    Serial.print("Pushing out stepper motor...");
+    digitalWrite(belt_dc_dir, LOW); //counter-clockwise
+    analogWrite(belt_dc_pwm, 100);
+    delay(500);
+    analogWrite(belt_dc_pwm, 0);
+    Serial.println("OUT.");
+
+  /* Electromagnets disengage */
+    Serial.print("Turning off electro magnets...");
+    digitalWrite(emPin, LOW);
+    Serial.println("OFF.");
+    delay(10000); // Sleep 10 seconds to start our search
+    Serial.print("Looking for quad..."); // Restart our loop
+  /* Take off */
 }

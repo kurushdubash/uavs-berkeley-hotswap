@@ -16,27 +16,50 @@ cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
 
 surf = cv2.xfeatures2d.SURF_create(300)
 
+def distance(p1, p2):
+    return pow ( pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2), 0.5 )
+
+#return the angle of the rectangle in STRING form (for outputting) .. todo implement correctly
+def angleOfRect(image, rect):
+    ((x,y), (width, height), angle) = rect
+    return "{0:.2f}".format(angle)
+
+
+def drawArrow(image, correctionVec, magnitude):
+    norm = (SCALE / magnitude * correctionVec[0],  SCALE / magnitude * correctionVec[1])
+    #  [ 1/rt(2) -1/rt(2)  ;  1/rt(2) 1/rt(2) ] * scaled_vec
+    shift1 = (norm[0]/math.sqrt(2) - norm[1]/math.sqrt(2),
+                        norm[0]/math.sqrt(2) + norm[1]/math.sqrt(2))
+    shift2 = (norm[0]/math.sqrt(2) + norm[1]/math.sqrt(2),
+                        - norm[0]/math.sqrt(2) + norm[1]/math.sqrt(2))
+
+    cv2.line( image, (cent[0] + correctionVec[0],cent[1] + correctionVec[1]) , cent, (0,0,255), 2)
+    cv2.line( image, cent, (cent[0] + int(shift1[0]), cent[1] + int(shift1[1])), (0,0,255),2)
+    cv2.line( image, cent, (cent[0] + int(shift2[0]), cent[1] + int(shift2[1])), (0,0,255),2)
+
+    return image
+
+#draw the rotated rect on the inputted image
+def drawRotatedRect(image, rect_points, color=(0,0,255), thickness=2):
+    for j in range(4):
+        cv2.line(image, rect_points[j], rect_points[(j+1)%4], color, thickness)
+        # cv2.line( original, tuple(rect_points[j]), tuple(rect_points[(j+1)%4]), (0,0,255), 2)
+        # cv2.line( img_matches, (int(rect_points[j][0] + logo.shape[1]), int(rect_points[j][1])), 
+        #     (int(rect_points[(j+1)%4][0] + logo.shape[1]), int(rect_points[(j+1)%4][1])), (255, 0, 255), 4);
+    return image
 
 def withinRatioTol(rect):
     ((x,y), (width, height), angle) = rect
     return False if width == 0 or height == 0 else abs(width / height - BOUNDING_RATIO) < 0.2 or abs(height / width - BOUNDING_RATIO) < 0.2
 
+# get the rect 
 def rectDistanceAngle(rect):
     ((x,y), (width, height), angle) = rect
     longside_pix = max(width, height)
     return (int(x-cent[0]), int(y-cent[1])), FRAME_WIDTH * LONGSIDE_ACTUAL / longside_pix / (2 * math.tan(APERTURE_ANGLE));
 
-def processSurf(original, logo, keypoint_obj, descriptors_obj):
-
-    def distance(p1, p2):
-        return pow ( pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2), 0.5 )
-
-    m = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
-
-    keypoints_scene, descriptors_scene = surf.detectAndCompute(m, None)
-
-    matcher = cv2.BFMatcher(cv2.NORM_L2, True)
-    matches = matcher.knnMatch(descriptors_obj, descriptors_scene, k=1)
+#filter the matches to the most representative ones
+def filterMatches(matches, keypoint_obj, keypoints_scene):
 
     max_dist, min_dist = 0,100
 
@@ -65,6 +88,7 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
     #for filtering based on distance away from mean point
     mean_x = int(sum([x for x,y in scene_raw])/len(scene_raw))
     mean_y = int(sum([y for x,y in scene_raw])/len(scene_raw))
+
     # print(distance)
     distances = [ distance(pt, (mean_x, mean_y)) for pt in scene_raw]
     distances = sorted(distances)
@@ -89,6 +113,43 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
     obj = np.array(obj)
     scene = np.array(scene)
 
+    return good_matches, obj, scene, mean_x, mean_y
+
+
+def populateImages(original, img_matches, rect):
+    rect_points = cv2.boxPoints(rect)
+    rect_points = [ (int(pt[0]), int(pt[1])) for pt in rect_points ]
+
+    # get the distance away and the correction vector
+    correctionVec, dist = rectDistanceAngle(rect)
+    # TODO implement
+    angle = angleOfRect(original, rect)
+
+    mag = distance((0,0), correctionVec)
+    
+    if mag < OFF_TARGET_TOLERANCE:
+        cv2.circle(original, cent, OFF_TARGET_TOLERANCE, (0,255,0), 3)
+    else:
+        original = drawArrow(original, correctionVec, mag)
+
+    cv2.putText(original, "Distance: " + "{0:.2f}".format(dist) + "   Angle: " + angle, (40,40), cv2.FONT_HERSHEY_PLAIN, 0.8, (0,255,0), 2)
+
+    original = drawRotatedRect(original, rect_points)
+    img_matches = drawRotatedRect(img_matches, [ (x + logo.shape[1], y) for x,y in rect_points])
+
+    return original, img_matches
+
+def processSurf(original, logo, keypoint_obj, descriptors_obj):
+
+    m = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
+
+    keypoints_scene, descriptors_scene = surf.detectAndCompute(m, None)
+
+    matcher = cv2.BFMatcher(cv2.NORM_L2, True)
+    matches = matcher.knnMatch(descriptors_obj, descriptors_scene, k=1)
+
+    good_matches, obj, scene, mean_x, mean_y = filterMatches(matches, keypoint_obj, keypoints_scene)
+
     img_matches = None
 
     if len(good_matches) > 4:
@@ -100,49 +161,30 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
 
         #proceed if we have good matches
         H, mask = cv2.findHomography(obj, scene, method=cv2.RANSAC)
+
+        #get the corners of the logo image
         logo_corners = np.array([[0,0], [logo.shape[1], 0], [logo.shape[1], logo.shape[0]], [0, logo.shape[0]]], dtype='float32')
         logo_corners = np.array([logo_corners])
+
         if H is not None and H.shape[0] > 1:
-            #if there is a homography mat to use
-            # print(H)
+            #if there is a homography mat to use, use it
             scene_corners = cv2.perspectiveTransform(logo_corners, H)
             rect = cv2.minAreaRect(scene_corners)
+
             if withinRatioTol(rect):
-                rect_points = cv2.boxPoints(rect)
+                #draw everything including arrows
+                original, img_matches = populateImages(original, img_matches, rect)
 
-                correctionVec, dist = rectDistanceAngle(rect)
-                mag = distance((0,0), correctionVec)
-                norm = (SCALE / mag * correctionVec[0],  SCALE / mag * correctionVec[1])
-                #  [ 1/rt(2) -1/rt(2)  ;  1/rt(2) 1/rt(2) ] * scaled_vec
-                shift1 = (norm[0]/math.sqrt(2) - norm[1]/math.sqrt(2),
-                                    norm[0]/math.sqrt(2) + norm[1]/math.sqrt(2))
-                shift2 = (norm[0]/math.sqrt(2) + norm[1]/math.sqrt(2),
-                                    - norm[0]/math.sqrt(2) + norm[1]/math.sqrt(2))
-                
-                if mag < OFF_TARGET_TOLERANCE:
-                    cv2.circle(original, cent, OFF_TARGET_TOLERANCE, (0,255,0), 3)
-                else:
-                    cv2.line( original, (cent[0] + correctionVec[0],cent[1] + correctionVec[1]) , cent, (0,0,255), 2);
-                    cv2.line( original, cent, (cent[0] + int(shift1[0]), cent[1] + int(shift1[1])), (0,0,255),2);
-                    cv2.line( original, cent, (cent[0] + int(shift2[0]), cent[1] + int(shift2[1])), (0,0,255),2);
-                cv2.putText(original, "Distance: " + "{0:.2f}".format(dist), (40,40), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), 2)
-
-                for j in range(4):
-                    cv2.line( original, tuple(rect_points[j]), tuple(rect_points[(j+1)%4]), (0,0,255), 2)
-                    cv2.line( img_matches, (int(rect_points[j][0] + logo.shape[1]), int(rect_points[j][1])), 
-                        (int(rect_points[(j+1)%4][0] + logo.shape[1]), int(rect_points[(j+1)%4][1])), (255, 0, 255), 4);
-    # if img_matches is None :
     return original
-    # else:
-    #   return img_matches
 
 
+#read the frame from a byte stream
 def get_frame(stream):
     bytes=b''
-    count = 0
-    startTime = time.time()
+    # count = 0
+    # startTime = time.time()
     while True:
-        count += 1
+        # count += 1
         bytes+=stream.read(1024)
         a = bytes.find(b'\xff\xd8')
         b = bytes.find(b'\xff\xd9')
@@ -156,55 +198,63 @@ def get_frame(stream):
                 return i
 
 
-print("######### PYTHON DETECTION STARTING ########\n")
 
-logo = cv2.imread('cal_logo_uavs.png', cv2.IMREAD_GRAYSCALE)
-keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)          
+if __name__ == "__main__":
 
-cv2.namedWindow('Image',cv2.WND_PROP_FULLSCREEN)
+    global FRAME_WIDTH
+    global FRAME_HEIGHT
+    global cent
 
-ip=False 
-stream=""
-if len(sys.argv) > 1:
-    if sys.argv[1] != "--ip":
-        print("System arguments: --ip [for web camera]")
-        exit(0)
-    stream=urllib.request.urlopen('http://192.168.0.101:8081/video')
-    ip=True
+    print("######### PYTHON DETECTION STARTING ########\n")
 
-if not ip:
-    cap = cv2.VideoCapture(0) 
+    # loading the comparison image
+    logo = cv2.imread('cal_logo_uavs.png', cv2.IMREAD_GRAYSCALE)
+    keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)          
 
-while(True):
-    # Capture frame-by-frame
+    cv2.namedWindow('Image',cv2.WND_PROP_FULLSCREEN)
+
+    ip=False
+    stream=""
+
+    # load the vid stream if we pass in --ip
+    if len(sys.argv) > 1:
+        if sys.argv[1] != "--ip":
+            print("System arguments: --ip [for web camera]")
+            exit(0)
+        stream=urllib.request.urlopen('http://192.168.0.101:8081/video')
+        ip=True
+
+    # read from default video capture if not
     if not ip:
-        ret, original = cap.read()
-    else:
-        original = get_frame(stream)
-    if original is not None and original.shape[0] > 1:        
+        cap = cv2.VideoCapture(0) 
 
-        FRAME_WIDTH = int(original.shape[1]/1.6)
-        FRAME_HEIGHT = int(original.shape[0]/1.6)
-        cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
+    while(True):
+        # Capture frame-by-frame
+        if not ip:
+            ret, original = cap.read()
+        else:
+            original = get_frame(stream)
 
-        original = cv2.resize(original, (FRAME_WIDTH, FRAME_HEIGHT))
+        #if the frame is inputted and exists, resize, 
+        if original is not None and original.shape[0] > 1:        
 
-        # Our operations on the frame come here
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            FRAME_WIDTH = int(original.shape[1]/1.6)
+            FRAME_HEIGHT = int(original.shape[0]/1.6)
+            cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
 
-        original = processSurf(original, logo, keypoints_obj, descriptors_obj)
+            original = cv2.resize(original, (FRAME_WIDTH, FRAME_HEIGHT))
 
-        original = cv2.resize(original, (FRAME_WIDTH*2, FRAME_HEIGHT*2))
-        # Display the resulting frame
-        # cv2.setWindowProperty("Image", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        cv2.imshow('Image',original)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            original = processSurf(original, logo, keypoints_obj, descriptors_obj)
 
-# When everything done, release the capture
-if not ip:
-    cap.release()
-cv2.destroyAllWindows()
+            # original = cv2.resize(original, (FRAME_WIDTH*2, FRAME_HEIGHT*2))
+            cv2.imshow('Image',original)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    # When everything done, release the capture
+    if not ip:
+        cap.release()
+    cv2.destroyAllWindows()
 
 
 

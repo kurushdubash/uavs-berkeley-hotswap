@@ -1,7 +1,7 @@
 import cv2
 import urllib
 import numpy as np
-import math
+import math, sys
 
 APERTURE_ANGLE = 30.0 * math.pi / 180.0 #radians
 LONGSIDE_ACTUAL = 4.0 #inches rn
@@ -147,21 +147,31 @@ def get_frame(stream):
         i = cv2.imdecode(np.fromstring(jpg, dtype=np.uint8),cv2.CV_LOAD_IMAGE_COLOR)
         return i
 
-
 print("######### PYTHON DETECTION STARTING ########\n")
 
 logo = cv2.imread('cal_logo_uavs.png', cv2.IMREAD_GRAYSCALE)
-keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)
-
-# cap = cv2.VideoCapture(0)            
+keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)          
 
 cv2.namedWindow('Image',cv2.WINDOW_AUTOSIZE)
 
-stream=urllib.urlopen('http://192.168.0.101:8081/video')
+ip=False 
+stream=""
+if len(sys.argv) > 1:
+    if sys.argv[1] != "--ip":
+        print "System arguments: --ip [for web camera]"
+        exit(0)
+    stream=urllib.urlopen('http://192.168.0.101:8081/video')
+    ip=True
+
+if ip:
+    cap = cv2.VideoCapture(0) 
+
 while(True):
     # Capture frame-by-frame
-
-    original = get_frame(stream)
+    if ip:
+        ret, original = cap.read()
+    else:
+        original = get_frame(stream)
     if original.shape[0] > 1:
         original = cv2.resize(original, (int(original.shape[1]/1.5), int(original.shape[0]/1.5)))
 
@@ -176,7 +186,8 @@ while(True):
             break
 
 # When everything done, release the capture
-# cap.release()
+if not ip:
+    cap.release()
 cv2.destroyAllWindows()
 
 

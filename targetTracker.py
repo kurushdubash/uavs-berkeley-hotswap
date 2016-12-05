@@ -14,8 +14,10 @@ FRAME_HEIGHT = 480
 BOUNDING_RATIO = 1.675
 cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
 
-surf = cv2.xfeatures2d.SURF_create(300)
+# worked the best -- run averages.py to see average times for the 4 detectors I tried
+detector = cv2.BRISK_create() #cv2.xfeatures2d.BriefDescriptorExtractor_create() #ORB_create()#SURF_create(300)
 
+# distance between two tuple points
 def distance(p1, p2):
     return pow ( pow(p1[0] - p2[0], 2) + pow(p1[1] - p2[1], 2), 0.5 )
 
@@ -24,7 +26,7 @@ def angleOfRect(image, rect):
     ((x,y), (width, height), angle) = rect
     return "{0:.2f}".format(angle)
 
-
+#draws an arrow on the image
 def drawArrow(image, correctionVec, magnitude):
     norm = (SCALE / magnitude * correctionVec[0],  SCALE / magnitude * correctionVec[1])
     #  [ 1/rt(2) -1/rt(2)  ;  1/rt(2) 1/rt(2) ] * scaled_vec
@@ -48,17 +50,18 @@ def drawRotatedRect(image, rect_points, color=(0,0,255), thickness=2):
         #     (int(rect_points[(j+1)%4][0] + logo.shape[1]), int(rect_points[(j+1)%4][1])), (255, 0, 255), 4);
     return image
 
+# is the rectangle of a certain ratio (l:w)
 def withinRatioTol(rect):
     ((x,y), (width, height), angle) = rect
     return False if width == 0 or height == 0 else abs(width / height - BOUNDING_RATIO) < 0.2 or abs(height / width - BOUNDING_RATIO) < 0.2
 
-# get the rect 
-def rectDistanceAngle(rect):
+# get the rect's distance (represented as correction vector) and the distance
+def rectCorrectionVecAndDistance(rect):
     ((x,y), (width, height), angle) = rect
     longside_pix = max(width, height)
     return (int(x-cent[0]), int(y-cent[1])), FRAME_WIDTH * LONGSIDE_ACTUAL / longside_pix / (2 * math.tan(APERTURE_ANGLE));
 
-#filter the matches to the most representative ones
+#filter the matches to the most representative ones and return that
 def filterMatches(matches, keypoint_obj, keypoints_scene):
 
     max_dist, min_dist = 0,100
@@ -67,6 +70,7 @@ def filterMatches(matches, keypoint_obj, keypoints_scene):
     # print(descriptors_scene)
     # print(matches)
 
+    # find max and min distance
     for match in matches:
         if len(match) > 0:
             dist = match[0].distance
@@ -75,6 +79,7 @@ def filterMatches(matches, keypoint_obj, keypoints_scene):
             if dist > max_dist:
                 max_dist = dist
 
+    # only get the matches for which there is an actual match happening
     medium_matches = []
     scene_raw = []
     for match in matches:
@@ -85,7 +90,7 @@ def filterMatches(matches, keypoint_obj, keypoints_scene):
                 medium_matches.append(match[0])
                 scene_raw.append( keypoints_scene[train].pt )
     
-    #for filtering based on distance away from mean point
+    # for filtering based on distance away from mean point
     mean_x = int(sum([x for x,y in scene_raw])/len(scene_raw))
     mean_y = int(sum([y for x,y in scene_raw])/len(scene_raw))
 
@@ -93,7 +98,9 @@ def filterMatches(matches, keypoint_obj, keypoints_scene):
     distances = [ distance(pt, (mean_x, mean_y)) for pt in scene_raw]
     distances = sorted(distances)
     maxDist = distances[-1]
+    #median distance from the mean point
     medianDist = distances[len(distances)//2]
+    # halfway between the medianDist and the maxDist
     threshDist = medianDist + (maxDist-medianDist)/2
 
     obj = []
@@ -101,6 +108,7 @@ def filterMatches(matches, keypoint_obj, keypoints_scene):
 
     good_matches = []
 
+    #filter based on the max dist and the distance to mean point (in comparison to recently calculated thresh point)
     for match in medium_matches:
         pt_obj = keypoint_obj[ match.queryIdx ].pt
         pt_scene = keypoints_scene[ match.trainIdx ].pt
@@ -115,13 +123,13 @@ def filterMatches(matches, keypoint_obj, keypoints_scene):
 
     return good_matches, obj, scene, mean_x, mean_y
 
-
+# fill images with rectangles, arrows, text, etc about the inputted rect
 def populateImages(original, img_matches, rect):
     rect_points = cv2.boxPoints(rect)
     rect_points = [ (int(pt[0]), int(pt[1])) for pt in rect_points ]
 
     # get the distance away and the correction vector
-    correctionVec, dist = rectDistanceAngle(rect)
+    correctionVec, dist = rectCorrectionVecAndDistance(rect)
     # TODO implement
     angle = angleOfRect(original, rect)
 
@@ -137,13 +145,14 @@ def populateImages(original, img_matches, rect):
     original = drawRotatedRect(original, rect_points)
     img_matches = drawRotatedRect(img_matches, [ (x + logo.shape[1], y) for x,y in rect_points])
 
-    return original, img_matches
+    return original, img_matches, correctionVec, angle
 
-def processSurf(original, logo, keypoint_obj, descriptors_obj):
+# run the feature detection, find matches, find homography, perspectiveTransform, draw the rectangles and arrows, and return back populated image
+def processFeatures(original, logo, keypoint_obj, descriptors_obj):
 
     m = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
 
-    keypoints_scene, descriptors_scene = surf.detectAndCompute(m, None)
+    keypoints_scene, descriptors_scene = detector.detectAndCompute(m, None)
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, True)
     matches = matcher.knnMatch(descriptors_obj, descriptors_scene, k=1)
@@ -151,6 +160,10 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
     good_matches, obj, scene, mean_x, mean_y = filterMatches(matches, keypoint_obj, keypoints_scene)
 
     img_matches = None
+
+    dist = None
+    correctionVec = None
+    angle = None
 
     if len(good_matches) > 4:
         #finally done filtering
@@ -173,10 +186,14 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
 
             if withinRatioTol(rect):
                 #draw everything including arrows
-                original, img_matches = populateImages(original, img_matches, rect)
+                original, img_matches, correctionVec, angle = populateImages(original, img_matches, rect)
 
-    return original
+    return original, correctionVec, dist, angle
 
+# TODO: when we have MAVLINK and stuff set up to respond to inputted distance
+def autoLandAdjust(image, correctionVec, dist, angle):
+    #do something here eventually
+    return
 
 #read the frame from a byte stream
 def get_frame(stream):
@@ -198,18 +215,15 @@ def get_frame(stream):
                 return i
 
 
-
+# continuous loop!
 if __name__ == "__main__":
-
-    global FRAME_WIDTH
-    global FRAME_HEIGHT
-    global cent
+    # cv2.ocl.setUseOpenCL(False)
 
     print("######### PYTHON DETECTION STARTING ########\n")
 
     # loading the comparison image
     logo = cv2.imread('cal_logo_uavs.png', cv2.IMREAD_GRAYSCALE)
-    keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)          
+    keypoints_obj, descriptors_obj = detector.detectAndCompute(logo, None)          
 
     cv2.namedWindow('Image',cv2.WND_PROP_FULLSCREEN)
 
@@ -237,14 +251,23 @@ if __name__ == "__main__":
 
         #if the frame is inputted and exists, resize, 
         if original is not None and original.shape[0] > 1:        
-
+            # frame width and frame height scaled globally
             FRAME_WIDTH = int(original.shape[1]/1.6)
             FRAME_HEIGHT = int(original.shape[0]/1.6)
+            #center of frame
             cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
 
+            # resize image to be maneagable in computation
             original = cv2.resize(original, (FRAME_WIDTH, FRAME_HEIGHT))
 
-            original = processSurf(original, logo, keypoints_obj, descriptors_obj)
+            # match detector features and draw found objects to original
+            # start = time.time()
+            original, correctionVec, dist, angle = processFeatures(original, logo, keypoints_obj, descriptors_obj)
+            # print(time.time() - start)
+
+            #the eventual drone adjustment aspect of the code
+            if correctionVec is not None and angle is not None:
+                autoLandAdjust(original, correctionVec, dist, angle)
 
             # original = cv2.resize(original, (FRAME_WIDTH*2, FRAME_HEIGHT*2))
             cv2.imshow('Image',original)

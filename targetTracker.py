@@ -1,5 +1,6 @@
 import cv2
 import urllib
+import urllib.request
 import numpy as np
 import math, sys
 
@@ -137,15 +138,19 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
 
 
 def get_frame(stream):
-    bytes=''
-    bytes+=stream.read(1024)
-    a = bytes.find('\xff\xd8')
-    b = bytes.find('\xff\xd9')
-    if a!=-1 and b!=-1:
-        jpg = bytes[a:b+2]
-        bytes= bytes[b+2:]
-        i = cv2.imdecode(np.fromstring(jpg, dtype=np.uint8),cv2.CV_LOAD_IMAGE_COLOR)
-        return i
+    bytes=b''
+    while True:
+        bytes+=stream.read(1024)
+        a = bytes.find(b'\xff\xd8')
+        b = bytes.find(b'\xff\xd9')
+        if a!=-1 and b!=-1:
+            jpg = bytes[a:b+2]
+            bytes= bytes[b+2:]
+            # print(jpg)
+            if jpg != b'':
+                i = cv2.imdecode(np.fromstring(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                return i
+
 
 print("######### PYTHON DETECTION STARTING ########\n")
 
@@ -158,21 +163,21 @@ ip=False
 stream=""
 if len(sys.argv) > 1:
     if sys.argv[1] != "--ip":
-        print "System arguments: --ip [for web camera]"
+        print("System arguments: --ip [for web camera]")
         exit(0)
-    stream=urllib.urlopen('http://192.168.0.101:8081/video')
+    stream=urllib.request.urlopen('http://192.168.0.101:8081/video')
     ip=True
 
-if ip:
+if not ip:
     cap = cv2.VideoCapture(0) 
 
 while(True):
     # Capture frame-by-frame
-    if ip:
+    if not ip:
         ret, original = cap.read()
     else:
         original = get_frame(stream)
-    if original.shape[0] > 1:
+    if original is not None and original.shape[0] > 1:
         original = cv2.resize(original, (int(original.shape[1]/1.5), int(original.shape[0]/1.5)))
 
         # Our operations on the frame come here

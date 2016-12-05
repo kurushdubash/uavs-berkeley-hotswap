@@ -1,4 +1,5 @@
 import cv2
+import urllib
 import numpy as np
 import math
 
@@ -135,18 +136,32 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
     #   return img_matches
 
 
+def get_frame(stream):
+    bytes=''
+    bytes+=stream.read(1024)
+    a = bytes.find('\xff\xd8')
+    b = bytes.find('\xff\xd9')
+    if a!=-1 and b!=-1:
+        jpg = bytes[a:b+2]
+        bytes= bytes[b+2:]
+        i = cv2.imdecode(np.fromstring(jpg, dtype=np.uint8),cv2.CV_LOAD_IMAGE_COLOR)
+        return i
+
+
 print("######### PYTHON DETECTION STARTING ########\n")
 
 logo = cv2.imread('cal_logo_uavs.png', cv2.IMREAD_GRAYSCALE)
 keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)
 
-cap = cv2.VideoCapture(0)
+# cap = cv2.VideoCapture(0)            
 
 cv2.namedWindow('Image',cv2.WINDOW_AUTOSIZE)
 
+stream=urllib.urlopen('http://192.168.0.101:8081/video')
 while(True):
     # Capture frame-by-frame
-    ret, original = cap.read()
+
+    original = get_frame(stream)
     if original.shape[0] > 1:
         original = cv2.resize(original, (int(original.shape[1]/1.5), int(original.shape[0]/1.5)))
 
@@ -161,9 +176,8 @@ while(True):
             break
 
 # When everything done, release the capture
-cap.release()
+# cap.release()
 cv2.destroyAllWindows()
-
 
 
 

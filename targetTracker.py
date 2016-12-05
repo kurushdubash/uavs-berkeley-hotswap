@@ -129,10 +129,10 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
                     cv2.line( original, tuple(rect_points[j]), tuple(rect_points[(j+1)%4]), (0,0,255), 2)
                     cv2.line( img_matches, (int(rect_points[j][0] + logo.shape[1]), int(rect_points[j][1])), 
                         (int(rect_points[(j+1)%4][0] + logo.shape[1]), int(rect_points[(j+1)%4][1])), (255, 0, 255), 4);
-    if img_matches is None :
-        return original
-    return img_matches
-
+    # if img_matches is None :
+    return original
+    # else:
+    #   return img_matches
 
 
 print("######### PYTHON DETECTION STARTING ########\n")

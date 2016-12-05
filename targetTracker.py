@@ -3,6 +3,7 @@ import urllib
 import urllib.request
 import numpy as np
 import math, sys
+import time
 
 APERTURE_ANGLE = 30.0 * math.pi / 180.0 #radians
 LONGSIDE_ACTUAL = 4.0 #inches rn
@@ -14,7 +15,6 @@ BOUNDING_RATIO = 1.675
 cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
 
 surf = cv2.xfeatures2d.SURF_create(300)
-
 
 
 def withinRatioTol(rect):
@@ -139,7 +139,10 @@ def processSurf(original, logo, keypoint_obj, descriptors_obj):
 
 def get_frame(stream):
     bytes=b''
+    count = 0
+    startTime = time.time()
     while True:
+        count += 1
         bytes+=stream.read(1024)
         a = bytes.find(b'\xff\xd8')
         b = bytes.find(b'\xff\xd9')
@@ -149,6 +152,7 @@ def get_frame(stream):
             # print(jpg)
             if jpg != b'':
                 i = cv2.imdecode(np.fromstring(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                # print(count, time.time() - startTime)
                 return i
 
 
@@ -157,7 +161,7 @@ print("######### PYTHON DETECTION STARTING ########\n")
 logo = cv2.imread('cal_logo_uavs.png', cv2.IMREAD_GRAYSCALE)
 keypoints_obj, descriptors_obj = surf.detectAndCompute(logo, None)          
 
-cv2.namedWindow('Image',cv2.WINDOW_AUTOSIZE)
+cv2.namedWindow('Image',cv2.WND_PROP_FULLSCREEN)
 
 ip=False 
 stream=""
@@ -177,15 +181,22 @@ while(True):
         ret, original = cap.read()
     else:
         original = get_frame(stream)
-    if original is not None and original.shape[0] > 1:
-        original = cv2.resize(original, (int(original.shape[1]/1.5), int(original.shape[0]/1.5)))
+    if original is not None and original.shape[0] > 1:        
+
+        FRAME_WIDTH = int(original.shape[1]/1.6)
+        FRAME_HEIGHT = int(original.shape[0]/1.6)
+        cent = (FRAME_WIDTH//2, FRAME_HEIGHT//2)
+
+        original = cv2.resize(original, (FRAME_WIDTH, FRAME_HEIGHT))
 
         # Our operations on the frame come here
         # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         original = processSurf(original, logo, keypoints_obj, descriptors_obj)
 
+        original = cv2.resize(original, (FRAME_WIDTH*2, FRAME_HEIGHT*2))
         # Display the resulting frame
+        # cv2.setWindowProperty("Image", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.imshow('Image',original)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

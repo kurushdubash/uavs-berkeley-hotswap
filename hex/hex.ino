@@ -1,4 +1,4 @@
-  #include <Stepper.h>
+#include <Stepper.h>
 #include <QueueArray.h>
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
@@ -8,10 +8,9 @@
   This module is for the hexacopter landing pad.
 */
 
-// MOTOR SHIELD (1)
+// MOTOR SHIELD
 Adafruit_MotorShield AFMS_bottom(0x60);
 Adafruit_MotorShield AFMS_top(0x61);
-
 
 // LEDs will be used as on-board indicators
 int LED_GREEN = 7; // Set green LED pin to 7
@@ -31,9 +30,9 @@ int belt_dc_dir = 0;
 int belt_dc_pwm = 0;
 
 //initializing the speed at which each motor will run
-int treadmill_dc_speed = 100;
-int belt_dc_speed = 100;
-int battery_mover_dc_speed = 100;
+int treadmill_dc_speed = 200;
+int belt_dc_speed = 200;
+int battery_mover_dc_speed = 200;
 
 // Ultra-sonic sensor for triggering when drone is in position
 int trigPin = 11; // intialize trig Pin to 12 & echoPin to 11
@@ -44,15 +43,16 @@ int emPin = 8;
 
 //speed constants
 int STEPPER_UNSCREW_SPEED = 200;
-int BELT_MOVE_SPEED = 100;
-int TREADMILL_SPEED = 100;
+int BELT_MOVE_SPEED = 200;
+int TREADMILL_SPEED = 200;
 
 //time constants
-int LANDING_DELAY = 1000;
-int BELT_MOVE_TIME = 1000;
-int TREADMILL_WAIT_TIME = 2000;
+int LANDING_DELAY = 3000;
+int BELT_MOVE_TIME = 3000;
+int TREADMILL_WAIT_TIME = 3000;
 int SCREW_DELAY = 1000;
-int POST_SWAP_DELAY = 10000;
+int POST_SWAP_DELAY = 20000;
+int BETWEEN_STEPS_TIME = 750;
 
 QueueArray <double> distances;
 double SONAR_DIST_THRESH = 3.0;
@@ -82,11 +82,6 @@ void setup()
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
 
-//  pinMode(belt_dc_dir, OUTPUT);
-//  pinMode(treadmill_dc_dir, OUTPUT);
-//  pinMode(belt_dc_pwm, OUTPUT);
-//  pinMode(treadmill_dc_pwm, OUTPUT);
-//  
   // initalize Ultra-sonic sensor
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -98,7 +93,6 @@ void setup()
   Serial.println("BOOT COMPLETE."); 
   Serial.print("Looking for quad...");
 
-//  performSwap();
 }
 
 
@@ -125,7 +119,6 @@ void loop() {
   else{
     digitalWrite(emPin, LOW);
   }
-  
 }
 
 boolean quadInRange(int distance){
@@ -182,19 +175,21 @@ void performSwap(){
 
   /* Push in stepper motor with belt_dc */
     Serial.print("Pushing in stepper motor...");
-//    digitalWrite(belt_dc_dir, HIGH); //clockwise
-//    analogWrite(belt_dc_pwm, BELT_MOVE_SPEED); //in
     belt_dc->run(FORWARD);
     delay(BELT_MOVE_TIME);
-//    analogWrite(belt_dc_pwm, 0);
     belt_dc->run(RELEASE);
     Serial.println("PUSHED.");
+
+    delay(BETWEEN_STEPS_TIME);
   
   /* Stepper motor unscrews */
     Serial.print("Unscrewing...");
     stepper->step(2*steps_per_rev, BACKWARD, DOUBLE);
+    stepper->release();
     delay(SCREW_DELAY);
     Serial.println("UNSCREWED.");
+
+    delay(BETWEEN_STEPS_TIME);
       
   /* Push out stepper motor with belt_dc */
     Serial.print("Pushing out stepper motor...");
@@ -206,6 +201,7 @@ void performSwap(){
     belt_dc->run(RELEASE);
     Serial.println("ON.");
 
+    delay(BETWEEN_STEPS_TIME);
   /* Magazine loads new pack on treadmill */
   
   /* DC motor treadmill slide battery in */
@@ -218,36 +214,42 @@ void performSwap(){
     treadmill_dc->run(RELEASE);
     Serial.println("IN.");
 
+    delay(BETWEEN_STEPS_TIME);
+    
   /* Push in stepper motor with belt_dc */
     Serial.print("Push in stepper motor...");
-//    digitalWrite(belt_dc_dir, HIGH); //clockwise
-//    analogWrite(belt_dc_pwm, BELT_MOVE_SPEED);
     belt_dc->run(FORWARD);
     delay(BELT_MOVE_TIME);
-//    analogWrite(belt_dc_pwm, 0);
     belt_dc->run(RELEASE);
     Serial.println("PUSHED.");
+
+    delay(BETWEEN_STEPS_TIME);
 
   /* Stepper motor screws in */
     Serial.print("Screwing in...");
     stepper->step(2*steps_per_rev, FORWARD, DOUBLE); //two rotations
+    stepper->release();
     delay(SCREW_DELAY);
     Serial.println("IN.");
 
+    delay(BETWEEN_STEPS_TIME);
+
   /* Push out stepper motor with belt_dc */
     Serial.print("Pushing out stepper motor...");
-//    digitalWrite(belt_dc_dir, LOW); //counter-clockwise
-//    analogWrite(belt_dc_pwm, BELT_MOVE_SPEED);
     belt_dc->run(BACKWARD);
     delay(BELT_MOVE_TIME);
-//    analogWrite(belt_dc_pwm, 0);
     belt_dc->run(RELEASE);
     Serial.println("OUT.");
 
+    delay(BETWEEN_STEPS_TIME);
+    
   /* Electromagnets disengage */
     Serial.print("Turning off electro magnets...");
     digitalWrite(emPin, LOW);
 
+    delay(BETWEEN_STEPS_TIME);
+
+    Serial.print("Moving Batteries...");
     battery_mover_dc->run(FORWARD);
     delay(1000);
     battery_mover_dc->run(RELEASE);

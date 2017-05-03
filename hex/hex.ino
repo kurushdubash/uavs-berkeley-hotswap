@@ -65,8 +65,8 @@ void setup()
   AFMS_top.begin();
   stepper = AFMS_bottom.getStepper(768, 2);
   stepper->setSpeed(STEPPER_UNSCREW_SPEED);
-  treadmill_dc = AFMS_bottom.getMotor(1);
-  belt_dc = AFMS_bottom.getMotor(2);
+  treadmill_dc = AFMS_bottom.getMotor(2);
+  belt_dc = AFMS_bottom.getMotor(1);
   battery_mover_dc = AFMS_top.getMotor(1);
 
   //set motors to run at their corresponding speeds
@@ -114,6 +114,7 @@ void loop() {
   Serial.println(" cm");
 
   if(quadInRange(distance)){
+    Serial.println("PERFORMING SWAP");
     performSwap();
   }
   else{

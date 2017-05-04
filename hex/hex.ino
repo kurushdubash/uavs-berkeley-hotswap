@@ -6,6 +6,8 @@
 /*
   UAVs@Berkeley HotSwap Project
   This module is for the hexacopter landing pad.
+
+  Authors: Kurush Dubash, Murtaza Dalal, & Suneel Belkhale
 */
 
 // MOTOR SHIELD
@@ -23,11 +25,11 @@ Adafruit_DCMotor *treadmill_dc;
 Adafruit_DCMotor *belt_dc;
 Adafruit_DCMotor *battery_mover_dc;
 
-//directions and pwm's
-int treadmill_dc_dir = 0;
-int treadmill_dc_pwm = 0;
-int belt_dc_dir = 0;
-int belt_dc_pwm = 0;
+////directions and pwm's
+//int treadmill_dc_dir = 0;
+//int treadmill_dc_pwm = 0;
+//int belt_dc_dir = 0;
+//int belt_dc_pwm = 0;
 
 //initializing the speed at which each motor will run
 int treadmill_dc_speed = 200;
@@ -35,7 +37,7 @@ int belt_dc_speed = 200;
 int battery_mover_dc_speed = 200;
 
 // Ultra-sonic sensor for triggering when drone is in position
-int trigPin = 11; // intialize trig Pin to 12 & echoPin to 11
+int trigPin = 11;
 int echoPin = 12;
 
 // electromagnet
@@ -54,8 +56,9 @@ int SCREW_DELAY = 1000;
 int POST_SWAP_DELAY = 20000;
 int BETWEEN_STEPS_TIME = 750;
 
+//holds n most recent distance measurements, allows for averaging later
 QueueArray <double> distances;
-double SONAR_DIST_THRESH = 3.0;
+double SONAR_DIST_THRESH = 3.0; //cm
 
 void setup()
 {
@@ -108,20 +111,24 @@ void loop() {
   duration = pulseIn(echoPin, HIGH);
   distance = (duration / 2) / 29.1; //74=inches, 29.1=cm, 2.91=mm
 
-  
+  //debugging purposes
   Serial.print("Distance: ");
   Serial.print(distance);
   Serial.println(" cm");
 
+  //if sonar values in range on average
+  //performs swap (which breaks the execution loop until completion)
   if(quadInRange(distance)){
     Serial.println("PERFORMING SWAP");
     performSwap();
   }
   else{
+    //make sure everything is off
     digitalWrite(emPin, LOW);
   }
 }
 
+//averages distances over time for a more reliable reading.
 boolean quadInRange(int distance){
   if (distances.count() < 15){ // Not enough data stored yet
     distances.enqueue(distance);
@@ -155,6 +162,7 @@ boolean quadInRange(int distance){
   return false; 
 }
 
+//for if there is a pressure sensor
 boolean quadHasLanded(){
   // Read Pressure sensor data here:
   // If pressure = quad has landed
@@ -163,6 +171,7 @@ boolean quadHasLanded(){
   return true;
 }
 
+//breaks execution of loop until finished, performs full swap
 void performSwap(){
 
   /* Electromagnets engage, move on when pressure sensors sense landing */
@@ -194,11 +203,8 @@ void performSwap(){
       
   /* Push out stepper motor with belt_dc */
     Serial.print("Pushing out stepper motor...");
-//    digitalWrite(belt_dc_dir, LOW); //counter clockwise
-//    analogWrite(belt_dc_pwm, BELT_MOVE_SPEED); //out
     belt_dc->run(BACKWARD);
     delay(BELT_MOVE_TIME);
-//    analogWrite(belt_dc_pwm, 0);
     belt_dc->run(RELEASE);
     Serial.println("ON.");
 
@@ -207,11 +213,8 @@ void performSwap(){
   
   /* DC motor treadmill slide battery in */
     Serial.print("Sliding in battery...");
-//    digitalWrite(treadmill_dc_dir, HIGH);
-//    analogWrite(treadmill_dc_pwm, TREADMILL_SPEED); //moves treadmill
     treadmill_dc->run(FORWARD);
     delay(TREADMILL_WAIT_TIME);
-//    analogWrite(treadmill_dc_pwm, 0);
     treadmill_dc->run(RELEASE);
     Serial.println("IN.");
 
@@ -249,7 +252,10 @@ void performSwap(){
     digitalWrite(emPin, LOW);
 
     delay(BETWEEN_STEPS_TIME);
-
+    
+  /* Take off within 10 seconds */
+    
+  /* battery mover loads new one */
     Serial.print("Moving Batteries...");
     battery_mover_dc->run(FORWARD);
     delay(1000);
@@ -258,5 +264,4 @@ void performSwap(){
     Serial.println("OFF.");
     delay(POST_SWAP_DELAY); // Sleep 10 seconds to start our search
     Serial.print("Looking for quad..."); // Restart our loop
-  /* Take off */
 }
